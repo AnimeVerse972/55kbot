@@ -45,7 +45,7 @@ bot = Bot(token=API_TOKEN)
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
 
-ADMINS = {6486825926, 7575041003}
+ADMINS = {6486825926, 7346481297}
 
 # === KEYBOARDS ===
 def admin_keyboard():
@@ -471,7 +471,7 @@ async def add_admin_process(message: types.Message, state: FSMContext):
 
 
 # === Kod statistikasi ===
-@dp.message_handler(lambda m: m.text == "📈 Kod statistikasi", user_id=ADMINS)
+@dp.message_handler(lambda m: m.text == "📈 Kod statistikasi" and m.from_user.id in ADMINS)
 async def ask_stat_code(message: types.Message):
     await AdminStates.waiting_for_stat_code.set()
     await message.answer("📥 Kod raqamini yuboring:", reply_markup=control_keyboard())
@@ -583,7 +583,7 @@ async def delete_code_handler(message: types.Message, state: FSMContext):
 
 
 # === Post qilish ===
-@dp.message_handler(lambda m: m.text == "📤 Post qilish", user_id=ADMINS)
+@dp.message_handler(lambda m: m.text == "📤 Post qilish" and m.from_user.id in ADMINS)
 async def start_post_process(message: types.Message):
     await PostStates.waiting_for_image.set()
     await message.answer("🖼 Iltimos, post uchun rasm yoki video yuboring (video 60 sekunddan oshmasin).", reply_markup=control_keyboard())
@@ -670,7 +670,7 @@ async def get_post_button_text(message: types.Message, state: FSMContext):
         await state.finish()
 
 # === Anime qo'shish ===
-@dp.message_handler(lambda m: m.text == "➕ Anime qo‘shish", user_id=ADMINS)
+@dp.message_handler(lambda m: m.text == "➕ Anime qo‘shish" and m.from_user.id in ADMINS)
 async def add_start(message: types.Message):
     await AdminStates.waiting_for_kino_data.set()
     await message.answer("📝 Format: `KOD @kanal REKLAMA_ID POST_SONI ANIME_NOMI`\nMasalan: `91 @MyKino 4 12 naruto`", parse_mode="Markdown", reply_markup=control_keyboard())
