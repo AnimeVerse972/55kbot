@@ -35,8 +35,8 @@ load_dotenv()
 keep_alive()
 
 API_TOKEN = os.getenv("API_TOKEN")
-CHANNELS = [-1002576882467]
-LINKS = ["https://t.me/AniVerseUzDub"]
+CHANNELS = []
+LINKS = []
 MAIN_CHANNELS = []
 MAIN_LINKS = []
 BOT_USERNAME = os.getenv("BOT_USERNAME")
