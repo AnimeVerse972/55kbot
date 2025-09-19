@@ -669,11 +669,16 @@ async def get_post_button_text(message: types.Message, state: FSMContext):
     finally:
         await state.finish()
 
-# === Anime qo'shish ===
+# === Anime qo'shish (FAQAT BAZAGA) ===
 @dp.message_handler(lambda m: m.text == "➕ Anime qo‘shish" and m.from_user.id in ADMINS)
 async def add_start(message: types.Message):
     await AdminStates.waiting_for_kino_data.set()
-    await message.answer("📝 Format: `KOD @kanal REKLAMA_ID POST_SONI ANIME_NOMI`\nMasalan: `91 @MyKino 4 12 naruto`", parse_mode="Markdown", reply_markup=control_keyboard())
+    await message.answer(
+        "📝 Format: `KOD @kanal REKLAMA_ID POST_SONI ANIME_NOMI`\n"
+        "Masalan: `91 @MyKino 4 12 naruto`",
+        parse_mode="Markdown",
+        reply_markup=control_keyboard()
+    )
 
 @dp.message_handler(state=AdminStates.waiting_for_kino_data)
 async def add_kino_handler(message: types.Message, state: FSMContext):
@@ -697,20 +702,63 @@ async def add_kino_handler(message: types.Message, state: FSMContext):
             continue
         reklama_id = int(reklama_id)
         post_count = int(post_count)
-        await add_kino_code(code, server_channel, reklama_id + 1, post_count, title)
-        download_btn = InlineKeyboardMarkup().add(
-            InlineKeyboardButton("✨Yuklab olish✨", url=f"https://t.me/{BOT_USERNAME}?start={code}")
-        )
-        for ch in MAIN_CHANNELS:
-            try:
-                await bot.copy_message(ch, server_channel, reklama_id, reply_markup=download_btn)
-                successful += 1
-            except:
-                failed += 1
+        # ✅ Faqat bazaga yozamiz
+        await add_kino_code(code, server_channel, reklama_id, post_count, title)
+        successful += 1
 
-    await message.answer(f"✅ Yangi kodlar qo‘shildi:\n\n✅ Muvaffaqiyatli: {successful}\n❌ Xatolik: {failed}", reply_markup=admin_keyboard())
+    await message.answer(
+        f"✅ Yangi kodlar bazaga qo‘shildi:\n\n"
+        f"✅ Muvaffaqiyatli: {successful}\n❌ Xatolik: {failed}",
+        reply_markup=admin_keyboard()
+    )
     await state.finish()
 
+# === Post qilish (ENDI KOD SO‘RAYDI) ===
+@dp.message_handler(lambda m: m.text == "📤 Post qilish" and m.from_user.id in ADMINS)
+async def start_post_process(message: types.Message):
+    # Endi kod so'raymiz
+    await PostStates.waiting_for_code.set()
+    await message.answer("🔢 Qaysi anime KODini kanalga yubormoqchisiz?\nMasalan: `147`",
+                         reply_markup=control_keyboard())
+
+@dp.message_handler(state=PostStates.waiting_for_code)
+async def send_post_by_code(message: types.Message, state: FSMContext):
+    if message.text == "📡 Boshqarish":
+        await state.finish()
+        await send_admin_panel(message)
+        return
+
+    code = message.text.strip()
+    if not code.isdigit():
+        await message.answer("❌ Kod faqat raqamlardan iborat bo‘lishi kerak.", reply_markup=control_keyboard())
+        return
+
+    # ✅ Bazadan anime ma'lumotini olish
+    kino = await get_kino_code(code)   # ⚠️ Sizda mavjud bo‘lgan bazadan olish funksiyasi
+    if not kino:
+        await message.answer("❌ Bunday kod topilmadi.", reply_markup=control_keyboard())
+        return
+
+    server_channel = kino['server_channel']
+    reklama_id = kino['reklama_id'] - 1  # biz bazaga +1 bilan yozganmiz
+    download_btn = InlineKeyboardMarkup().add(
+        InlineKeyboardButton("✨Yuklab olish✨",
+                             url=f"https://t.me/{BOT_USERNAME}?start={code}")
+    )
+
+    successful, failed = 0, 0
+    for ch in MAIN_CHANNELS:
+        try:
+            await bot.copy_message(ch, server_channel, reklama_id, reply_markup=download_btn)
+            successful += 1
+        except:
+            failed += 1
+
+    await message.answer(
+        f"✅ Post yuborildi.\n\n✅ Muvaffaqiyatli: {successful}\n❌ Xatolik: {failed}",
+        reply_markup=admin_keyboard()
+    )
+    await state.finish()
 
 # === Kodlar ro'yxati ===
 @dp.message_handler(lambda m: m.text == "📄 Kodlar ro‘yxati")
