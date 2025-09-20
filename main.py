@@ -582,94 +582,6 @@ async def delete_code_handler(message: types.Message, state: FSMContext):
     else:
         await message.answer("❌ Kod topilmadi yoki o‘chirib bo‘lmadi.", reply_markup=admin_keyboard())
 
-
-# === Post qilish ===
-@dp.message_handler(lambda m: m.text == "📤 Post qilish" and m.from_user.id in ADMINS)
-async def start_post_process(message: types.Message):
-    await PostStates.waiting_for_image.set()
-    await message.answer("🖼 Iltimos, post uchun rasm yoki video yuboring (video 60 sekunddan oshmasin).", reply_markup=control_keyboard())
-
-
-@dp.message_handler(content_types=[types.ContentType.PHOTO, types.ContentType.VIDEO], state=PostStates.waiting_for_image)
-async def get_post_image_or_video(message: types.Message, state: FSMContext):
-    if message.text == "📡 Boshqarish":
-        await state.finish()
-        await send_admin_panel(message)
-        return
-
-    if message.content_type == "photo":
-        file_id = message.photo[-1].file_id
-        await state.update_data(media=("photo", file_id))
-    elif message.content_type == "video":
-        duration = getattr(message.video, "duration", 0)
-        if duration > 60:
-            await message.answer("❌ Video 60 sekunddan oshmasligi kerak. Qaytadan yuboring.", reply_markup=control_keyboard())
-            return
-        file_id = message.video.file_id
-        await state.update_data(media=("video", file_id))
-
-    await PostStates.waiting_for_title.set()
-    await message.answer("📌 Endi rasm/video ostiga yoziladigan nomni yuboring.", reply_markup=control_keyboard())
-
-
-@dp.message_handler(state=PostStates.waiting_for_title)
-async def get_post_title(message: types.Message, state: FSMContext):
-    if message.text == "📡 Boshqarish":
-        await state.finish()
-        await send_admin_panel(message)
-        return
-
-    await state.update_data(title=message.text.strip())
-    await PostStates.waiting_for_link.set()
-    await message.answer("🔗 Yuklab olish uchun havolani yuboring.", reply_markup=control_keyboard())
-
-
-@dp.message_handler(state=PostStates.waiting_for_link)
-async def get_post_link(message: types.Message, state: FSMContext):
-    if message.text == "📡 Boshqarish":
-        await state.finish()
-        await send_admin_panel(message)
-        return
-
-    await state.update_data(link=message.text.strip())
-    await PostStates.waiting_for_button_text.set()
-    await message.answer("✍️ Tugma uchun nom yuboring (masalan: 👉 Yuklab olish).", reply_markup=control_keyboard())
-
-
-@dp.message_handler(state=PostStates.waiting_for_button_text)
-async def get_post_button_text(message: types.Message, state: FSMContext):
-    if message.text == "📡 Boshqarish":
-        await state.finish()
-        await send_admin_panel(message)
-        return
-
-    await state.update_data(button_text=message.text.strip())
-    data = await state.get_data()
-
-    media = data.get("media")
-    if not media:
-        await message.answer("❗ Media topilmadi.", reply_markup=control_keyboard())
-        await PostStates.waiting_for_image.set()
-        return
-
-    media_type, file_id = media
-    title = data.get("title")
-    link = data.get("link")
-    button_text = data.get("button_text")
-
-    button = InlineKeyboardMarkup().add(InlineKeyboardButton(button_text, url=link))
-
-    try:
-        if media_type == "photo":
-            await bot.send_photo(message.chat.id, file_id, caption=title, reply_markup=button)
-        elif media_type == "video":
-            await bot.send_video(message.chat.id, file_id, caption=title, reply_markup=button)
-        await message.answer("✅ Post muvaffaqiyatli yuborildi.", reply_markup=admin_keyboard())
-    except Exception as e:
-        await message.answer(f"❌ Xatolik: {e}", reply_markup=admin_keyboard())
-    finally:
-        await state.finish()
-
 # === Anime qo'shish (FAQAT BAZAGA) ===
 @dp.message_handler(lambda m: m.text == "➕ Anime qo‘shish" and m.from_user.id in ADMINS)
 async def add_start(message: types.Message):
@@ -735,13 +647,13 @@ async def send_post_by_code(message: types.Message, state: FSMContext):
         return
 
     # ✅ Bazadan anime ma'lumotini olish
-    kino = await get_kino_code(code)   # ⚠️ Sizda mavjud bo‘lgan bazadan olish funksiyasi
+    kino = await get_kino_by_code(code)   # ⚠️ Sizda mavjud bo‘lgan bazadan olish funksiyasi
     if not kino:
         await message.answer("❌ Bunday kod topilmadi.", reply_markup=control_keyboard())
         return
 
-    server_channel = kino['server_channel']
-    reklama_id = kino['reklama_id'] - 1  # biz bazaga +1 bilan yozganmiz
+        server_channel = kino['channel']
+        reklama_id = kino['message_id'] # biz bazaga +1 bilan yozganmiz
     download_btn = InlineKeyboardMarkup().add(
         InlineKeyboardButton("✨Yuklab olish✨",
                              url=f"https://t.me/{BOT_USERNAME}?start={code}")
@@ -943,7 +855,7 @@ async def send_reklama_post(user_id, code):
     )
 
     try:
-        await bot.copy_message(user_id, channel, reklama_id - 1, reply_markup=keyboard)
+        await bot.copy_message(user_id, channel, reklama_id, reply_markup=keyboard)
     except:
         await bot.send_message(user_id, "❌ Reklama postni yuborib bo‘lmadi.")
 
