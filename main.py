@@ -629,7 +629,7 @@ async def add_kino_handler(message: types.Message, state: FSMContext):
 # === Post qilish (ENDI KOD SO‘RAYDI) ===
 @dp.message_handler(lambda m: m.text == "📤 Post qilish" and m.from_user.id in ADMINS)
 async def start_post_process(message: types.Message):
-    # Endi kod so'raymiz
+    # Endi kod so‘raymiz
     await PostStates.waiting_for_code.set()
     await message.answer("🔢 Qaysi anime KODini kanalga yubormoqchisiz?\nMasalan: `147`",
                          reply_markup=control_keyboard())
@@ -647,13 +647,16 @@ async def send_post_by_code(message: types.Message, state: FSMContext):
         return
 
     # ✅ Bazadan anime ma'lumotini olish
-    kino = await get_kino_by_code(code)   # ⚠️ Sizda mavjud bo‘lgan bazadan olish funksiyasi
+    kino = await get_kino_by_code(code)   # sizda database.py da shu funksiya bor
     if not kino:
         await message.answer("❌ Bunday kod topilmadi.", reply_markup=control_keyboard())
         return
 
-        server_channel = kino['channel']
-        reklama_id = kino['message_id'] # biz bazaga +1 bilan yozganmiz
+    # ⚡ To‘g‘ri joy tashlash
+    server_channel = kino['channel']
+    reklama_id = kino['message_id'] - 1   # chunki biz bazaga +1 bilan yozganmiz
+
+    # 🔘 Yuklab olish tugmasi
     download_btn = InlineKeyboardMarkup().add(
         InlineKeyboardButton("✨Yuklab olish✨",
                              url=f"https://t.me/{BOT_USERNAME}?start={code}")
@@ -664,7 +667,8 @@ async def send_post_by_code(message: types.Message, state: FSMContext):
         try:
             await bot.copy_message(ch, server_channel, reklama_id, reply_markup=download_btn)
             successful += 1
-        except:
+        except Exception as e:
+            print(f"Xato: {e}")  # ✅ log chiqarish uchun
             failed += 1
 
     await message.answer(
