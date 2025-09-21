@@ -672,57 +672,31 @@ async def anime_done_handler(message: types.Message, state: FSMContext):
     )
     await state.finish()
 
-# === Post qilish (ENDI KOD SO‘RAYDI) ===
 @dp.message_handler(lambda m: m.text == "📤 Post qilish" and m.from_user.id in ADMINS)
 async def start_post_process(message: types.Message):
-    # Endi kod so‘raymiz
     await PostStates.waiting_for_code.set()
-    await message.answer("🔢 Qaysi anime KODini kanalga yubormoqchisiz?\nMasalan: `147`",
-                         reply_markup=control_keyboard())
+    await message.answer("🔢 Qaysi anime KODini kanalga yubormoqchisiz?\nMasalan: `147`")
 
 @dp.message_handler(state=PostStates.waiting_for_code)
-async def send_post_by_code(message: types.Message, state: FSMContext):
-    if message.text == "📡 Boshqarish":
-        await state.finish()
-        await send_admin_panel(message)
-        return
-
+async def process_code(message: types.Message, state: FSMContext):
     code = message.text.strip()
-    if not code.isdigit():
-        await message.answer("❌ Kod faqat raqamlardan iborat bo‘lishi kerak.", reply_markup=control_keyboard())
+    anime = await get_anime(code)
+    if not anime:
+        await message.answer("❌ Bunday KOD topilmadi!")
+        await state.finish()
         return
-
-    # ✅ Bazadan anime ma'lumotini olish
-    kino = await get_kino_by_code(code)   # sizda database.py da shu funksiya bor
-    if not kino:
-        await message.answer("❌ Bunday kod topilmadi.", reply_markup=control_keyboard())
-        return
-
-    # ⚡ To‘g‘ri joy tashlash
-    server_channel = kino['channel']
-    reklama_id = kino['message_id'] - 1   # chunki biz bazaga +1 bilan yozganmiz
-
-    # 🔘 Yuklab olish tugmasi
-    download_btn = InlineKeyboardMarkup().add(
-        InlineKeyboardButton("✨Yuklab olish✨",
-                             url=f"https://t.me/{BOT_USERNAME}?start={code}")
+    await state.update_data(code=code)
+    # Inline tugma yaratish
+    keyboard = InlineKeyboardMarkup().add(
+        InlineKeyboardButton("📥 Qismlarni ko‘rish", callback_data=f"start={code}")
     )
-
-    successful, failed = 0, 0
-    for ch in MAIN_CHANNELS:
-        try:
-            await bot.copy_message(ch, server_channel, reklama_id, reply_markup=download_btn)
-            successful += 1
-        except Exception as e:
-            print(f"Xato: {e}")  # ✅ log chiqarish uchun
-            failed += 1
-
-    await message.answer(
-        f"✅ Post yuborildi.\n\n✅ Muvaffaqiyatli: {successful}\n❌ Xatolik: {failed}",
-        reply_markup=admin_keyboard()
+    await bot.send_photo(
+        chat_id=message.chat.id,
+        photo=anime['poster_file_id'],
+        caption=f"🎬 {anime['title']}\n\n{anime['caption']}",
+        reply_markup=keyboard
     )
     await state.finish()
-
 # === Kodlar ro'yxati ===
 @dp.message_handler(lambda m: m.text == "📄 Kodlar ro‘yxati")
 async def show_all_animes(message: types.Message):
