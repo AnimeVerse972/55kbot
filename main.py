@@ -587,17 +587,6 @@ async def delete_code_handler(message: types.Message, state: FSMContext):
     else:
         await message.answer("❌ Kod topilmadi yoki o‘chirib bo‘lmadi.", reply_markup=admin_keyboard())
 
-# === Anime qo'shish (FAQAT BAZAGA) ===
-@dp.message_handler(lambda m: m.text == "➕ Anime qo‘shish" and m.from_user.id in ADMINS)
-async def add_start(message: types.Message):
-    await AdminStates.waiting_for_kino_data.set()
-    await message.answer(
-        "📝 Format: `KOD @kanal REKLAMA_ID POST_SONI ANIME_NOMI`\n"
-        "Masalan: `91 @MyKino 4 12 naruto`",
-        parse_mode="Markdown",
-        reply_markup=control_keyboard()
-    )
-
 
 # === ➕ Anime qo‘shish ===
 @dp.message_handler(lambda m: m.text == "➕ Anime qo‘shish")
