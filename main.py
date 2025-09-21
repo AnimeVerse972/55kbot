@@ -672,31 +672,54 @@ async def anime_done_handler(message: types.Message, state: FSMContext):
     )
     await state.finish()
 
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.dispatcher import FSMContext
+
+# Admin tugmasi bosilganda
 @dp.message_handler(lambda m: m.text == "📤 Post qilish" and m.from_user.id in ADMINS)
 async def start_post_process(message: types.Message):
     await PostStates.waiting_for_code.set()
     await message.answer("🔢 Qaysi anime KODini kanalga yubormoqchisiz?\nMasalan: `147`")
 
+
+# Admin kodni kiritsa
 @dp.message_handler(state=PostStates.waiting_for_code)
 async def process_code(message: types.Message, state: FSMContext):
     code = message.text.strip()
-    anime = await get_anime(code)
+    anime = await get_kino_by_code(code)
     if not anime:
         await message.answer("❌ Bunday KOD topilmadi!")
         await state.finish()
         return
+
     await state.update_data(code=code)
-    # Inline tugma yaratish
+
+    # Inline tugma foydalanuvchiga botni start qilish bilan yuboradi
     keyboard = InlineKeyboardMarkup().add(
-        InlineKeyboardButton("📥 Qismlarni ko‘rish", callback_data=f"start={code}")
+        InlineKeyboardButton(
+            "📥 Yuklab olish",
+            url=f"https://t.me/{BOT_USERNAME}?start={code}"
+        )
     )
-    await bot.send_photo(
-        chat_id=message.chat.id,
-        photo=anime['poster_file_id'],
-        caption=f"🎬 {anime['title']}\n\n{anime['caption']}",
-        reply_markup=keyboard
-    )
-    await state.finish()
+
+    try:
+        if anime.get('poster_file_id'):
+            await bot.send_photo(
+                chat_id=message.chat.id,
+                photo=anime['poster_file_id'],
+                caption=f"🎬 {anime.get('title','')}\n\n{anime.get('caption','')}",
+                reply_markup=keyboard
+            )
+        else:
+            await bot.send_message(
+                chat_id=message.chat.id,
+                text=f"🎬 {anime.get('title','')}\n\n{anime.get('caption','')}",
+                reply_markup=keyboard
+            )
+    except Exception as e:
+        await message.answer(f"❌ Postni yuborib bo‘lmadi: {e}")
+
+    await state.finish() 
 # === Kodlar ro'yxati ===
 @dp.message_handler(lambda m: m.text == "📄 Kodlar ro‘yxati")
 async def show_all_animes(message: types.Message):
@@ -848,6 +871,9 @@ async def send_forward_only(message: types.Message, state: FSMContext):
         reply_markup=admin_keyboard()
     )
 
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+import asyncio
+
 # === Kodni qidirish (raqam) ===
 @dp.message_handler(lambda message: message.text.isdigit())
 async def handle_code_message(message: types.Message):
@@ -855,7 +881,10 @@ async def handle_code_message(message: types.Message):
     unsubscribed = await get_unsubscribed_channels(message.from_user.id)
     if unsubscribed:
         markup = await make_unsubscribed_markup(message.from_user.id, code)
-        await message.answer("❗ Anime olishdan oldin quyidagi kanal(lar)ga obuna bo‘ling:", reply_markup=markup)
+        await message.answer(
+            "❗ Anime olishdan oldin quyidagi kanal(lar)ga obuna bo‘ling:",
+            reply_markup=markup
+        )
         return
 
     await increment_stat(code, "init")
@@ -871,15 +900,20 @@ async def send_reklama_post(user_id, code):
         await bot.send_message(user_id, "❌ Kod topilmadi.")
         return
 
-    channel, reklama_id, post_count = data["channel"], data["message_id"], data["post_count"]
-
-    # Endi faqat bitta tugma bo'ladi: "✨Yuklab olish"
+    poster_file_id = data["poster_file_id"]
+    caption = data.get("caption", "")
+    
+    # Inline tugma
     keyboard = InlineKeyboardMarkup().add(
         InlineKeyboardButton("✨Tomosha qilish✨", callback_data=f"download:{code}")
     )
 
     try:
-        await bot.copy_message(user_id, channel, reklama_id, reply_markup=keyboard)
+        if poster_file_id:
+            await bot.send_photo(user_id, poster_file_id, caption=caption, reply_markup=keyboard)
+        else:
+            # Agar poster yo'q bo'lsa, oddiy matn
+            await bot.send_message(user_id, caption or "Anime tayyor!", reply_markup=keyboard)
     except:
         await bot.send_message(user_id, "❌ Reklama postni yuborib bo‘lmadi.")
 
@@ -893,14 +927,20 @@ async def download_all(callback: types.CallbackQuery):
         await callback.message.answer("❌ Kod topilmadi.")
         return
 
-    channel, base_id, post_count = result["channel"], result["message_id"], result["post_count"]
+    parts_file_ids = result.get("parts_file_ids", [])
+    if not parts_file_ids:
+        await callback.message.answer("❌ Hech qanday qism topilmadi.")
+        return
 
     await callback.answer("⏳ Yuklanmoqda, biroz kuting...")
 
     # Hamma qismlarni ketma-ket yuborish
-    for i in range(post_count):
+    for file_id in parts_file_ids:
         try:
-            await bot.copy_message(callback.from_user.id, channel, base_id + i)
+            if file_id.startswith("BQAD") or file_id.startswith("AgAD"):  # photo/video/document check (file_id formatiga qarab)
+                await bot.send_document(callback.from_user.id, file_id)
+            else:
+                await bot.send_document(callback.from_user.id, file_id)
             await asyncio.sleep(0.1)  # flood control uchun sekin yuborish
         except:
             pass
