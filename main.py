@@ -98,7 +98,12 @@ class PostStates(StatesGroup):
 class KanalStates(StatesGroup):
     waiting_for_channel_id = State()
     waiting_for_channel_link = State()
-
+# === HOLATLAR ===
+class AddAnimeStates(StatesGroup):
+    waiting_for_code = State()
+    waiting_for_title = State()
+    waiting_for_poster = State()
+    waiting_for_parts = State()
 
 # === OBUNA TEKSHIRISH ===
 async def get_unsubscribed_channels(user_id):
@@ -593,35 +598,76 @@ async def add_start(message: types.Message):
         reply_markup=control_keyboard()
     )
 
-@dp.message_handler(state=AdminStates.waiting_for_kino_data)
-async def add_kino_handler(message: types.Message, state: FSMContext):
-    if message.text == "📡 Boshqarish":
-        await state.finish()
-        await send_admin_panel(message)
-        return
 
-    rows = message.text.strip().split("\n")
-    successful = 0
-    failed = 0
-    for row in rows:
-        parts = row.strip().split()
-        if len(parts) < 5:
-            failed += 1
-            continue
-        code, server_channel, reklama_id, post_count = parts[:4]
-        title = " ".join(parts[4:])
-        if not (code.isdigit() and reklama_id.isdigit() and post_count.isdigit()):
-            failed += 1
-            continue
-        reklama_id = int(reklama_id)
-        post_count = int(post_count)
-        # ✅ Faqat bazaga yozamiz
-        await add_kino_code(code, server_channel, reklama_id, post_count, title)
-        successful += 1
+# === ➕ Anime qo‘shish ===
+@dp.message_handler(lambda m: m.text == "➕ Anime qo‘shish")
+async def start_add_anime(message: types.Message, state: FSMContext):
+    if message.from_user.id not in ADMINS:
+        return
+    await message.answer("📝 Kodni kiriting:")
+    await AddAnimeStates.waiting_for_code.set()
+
+
+@dp.message_handler(state=AddAnimeStates.waiting_for_code)
+async def anime_code_handler(message: types.Message, state: FSMContext):
+    await state.update_data(code=message.text.strip())
+    await message.answer("📝 Anime nomini kiriting:")
+    await AddAnimeStates.waiting_for_title.set()
+
+
+@dp.message_handler(state=AddAnimeStates.waiting_for_title)
+async def anime_title_handler(message: types.Message, state: FSMContext):
+    await state.update_data(title=message.text.strip())
+    await message.answer("📸 Reklama postini yuboring (rasm/video/file, caption bilan bo‘lishi mumkin):")
+    await AddAnimeStates.waiting_for_poster.set()
+
+
+@dp.message_handler(content_types=["photo", "video", "document"], state=AddAnimeStates.waiting_for_poster)
+async def anime_poster_handler(message: types.Message, state: FSMContext):
+    file_id = None
+    if message.photo:
+        file_id = message.photo[-1].file_id
+    elif message.video:
+        file_id = message.video.file_id
+    elif message.document:
+        file_id = message.document.file_id
+
+    caption = message.caption if message.caption else ""
+    await state.update_data(poster_file_id=file_id, caption=caption, parts_file_ids=[])
+
+    await message.answer("📥 Endi qismlarni yuboring (video/file). Oxirida /done yuboring.")
+    await AddAnimeStates.waiting_for_parts.set()
+
+
+@dp.message_handler(content_types=["video", "document"], state=AddAnimeStates.waiting_for_parts)
+async def anime_parts_handler(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    parts = data.get("parts_file_ids", [])
+
+    file_id = message.video.file_id if message.video else message.document.file_id
+    parts.append(file_id)
+
+    await state.update_data(parts_file_ids=parts)
+    await message.answer(f"✅ Qism qo‘shildi. Hozircha {len(parts)} ta qism saqlandi.")
+
+
+@dp.message_handler(commands=["done"], state=AddAnimeStates.waiting_for_parts)
+async def anime_done_handler(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    code = data["code"]
+    title = data["title"]
+    poster_file_id = data["poster_file_id"]
+    caption = data["caption"]
+    parts_file_ids = data["parts_file_ids"]
+
+    await add_anime(code, title, poster_file_id, parts_file_ids)
 
     await message.answer(
-        f"✅ Yangi kodlar bazaga qo‘shildi:\n\n"
-        f"✅ Muvaffaqiyatli: {successful}\n❌ Xatolik: {failed}",
+        f"✅ Anime saqlandi!\n\n"
+        f"📌 Kod: <b>{code}</b>\n"
+        f"📖 Nomi: <b>{title}</b>\n"
+        f"📸 Reklama post caption: {caption}\n"
+        f"🎞 Qismlar soni: {len(parts_file_ids)}",
         reply_markup=admin_keyboard()
     )
     await state.finish()
