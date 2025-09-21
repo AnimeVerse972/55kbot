@@ -4,21 +4,23 @@ from dotenv import load_dotenv
 from datetime import date
 import asyncio
 
+# .env fayldan DATABASE_URL ni yuklash
 load_dotenv()
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 db_pool = None
 
 # === Databasega ulanish ===
 async def init_db(retries: int = 5, delay: int = 2):
     """
-    Ulanishni yaratadi, agar muvaffaqiyatsiz bo‘lsa qayta urinadi.
+    PostgreSQL poolini yaratadi va jadvallarni tayyorlaydi.
     """
     global db_pool
     for attempt in range(1, retries + 1):
         try:
             db_pool = await asyncpg.create_pool(
-                dsn=os.getenv("DATABASE_URL"),
-                ssl="require",
+                dsn=DATABASE_URL,
+                ssl="require",               # Cloudda kerak bo‘ladi
                 statement_cache_size=0
             )
             print("✅ Database pool yaratildi")
@@ -58,6 +60,7 @@ async def init_db(retries: int = 5, delay: int = 2):
             );
         """)
 
+        # Default admin qo‘shib qo‘yish
         default_admins = [6486825926]
         for admin_id in default_admins:
             await conn.execute(
@@ -90,17 +93,15 @@ async def add_user(user_id):
 async def get_user_count():
     pool = await get_conn()
     async with pool.acquire() as conn:
-        row = await conn.fetchrow("SELECT COUNT(*) FROM users")
-        return row[0]
+        return await conn.fetchval("SELECT COUNT(*) FROM users")
 
 async def get_today_users():
     pool = await get_conn()
     async with pool.acquire() as conn:
         today = date.today()
-        row = await conn.fetchrow(
+        return await conn.fetchval(
             "SELECT COUNT(*) FROM users WHERE DATE(created_at) = $1", today
         )
-        return row[0] if row else 0
 
 # === Anime bilan ishlash ===
 async def add_anime(code: str, title: str, poster_file_id: str, parts_file_ids: list[str]):
