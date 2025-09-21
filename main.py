@@ -639,8 +639,7 @@ async def anime_parts_handler(message: types.Message, state: FSMContext):
     await state.update_data(parts_file_ids=parts)
     await message.answer(f"✅ Qism qo‘shildi. Hozircha {len(parts)} ta qism saqlandi.")
 
-
-@dp.message_handler(commands=["done"], state=AddAnimeStates.waiting_for_parts)
+@dp.message_handler(lambda m: m.text.lower() == "/done", state=AddAnimeStates.waiting_for_parts)
 async def anime_done_handler(message: types.Message, state: FSMContext):
     data = await state.get_data()
     code = data["code"]
@@ -649,7 +648,7 @@ async def anime_done_handler(message: types.Message, state: FSMContext):
     caption = data["caption"]
     parts_file_ids = data["parts_file_ids"]
 
-    await add_anime(code, title, poster_file_id, parts_file_ids)
+    await add_anime(code, title, poster_file_id, parts_file_ids, caption)
 
     await message.answer(
         f"✅ Anime saqlandi!\n\n"
@@ -660,16 +659,6 @@ async def anime_done_handler(message: types.Message, state: FSMContext):
         reply_markup=admin_keyboard()
     )
     await state.finish()
-
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from aiogram.dispatcher import FSMContext
-
-# Admin tugmasi bosilganda
-@dp.message_handler(lambda m: m.text == "📤 Post qilish" and m.from_user.id in ADMINS)
-async def start_post_process(message: types.Message):
-    await PostStates.waiting_for_code.set()
-    await message.answer("🔢 Qaysi anime KODini kanalga yubormoqchisiz?\nMasalan: `147`")
-
 
 # Admin kodni kiritsa
 @dp.message_handler(state=PostStates.waiting_for_code)
