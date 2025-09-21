@@ -33,20 +33,24 @@ async def init_db(retries: int = 5, delay: int = 2):
 
     # Jadval yaratish
     async with db_pool.acquire() as conn:
+        # Foydalanuvchilar
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 user_id BIGINT PRIMARY KEY,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)
+        # Animelar
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS anime_codes (
                 code TEXT PRIMARY KEY,
                 title TEXT,
+                caption TEXT,
                 poster_file_id TEXT,
                 parts_file_ids TEXT[]
             );
         """)
+        # Statistika
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS stats (
                 code TEXT PRIMARY KEY,
@@ -54,6 +58,7 @@ async def init_db(retries: int = 5, delay: int = 2):
                 viewed INTEGER DEFAULT 0
             );
         """)
+        # Adminlar
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS admins (
                 user_id BIGINT PRIMARY KEY
@@ -103,24 +108,31 @@ async def get_today_users():
             "SELECT COUNT(*) FROM users WHERE DATE(created_at) = $1", today
         )
 
+async def get_all_user_ids():
+    pool = await get_conn()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("SELECT user_id FROM users")
+        return [row["user_id"] for row in rows]
+
 # === Anime bilan ishlash ===
-async def add_anime(code: str, title: str, poster_file_id: str, parts_file_ids: list[str]):
+async def add_anime(code: str, title: str, poster_file_id: str, parts_file_ids: list[str], caption: str = ""):
     pool = await get_conn()
     async with pool.acquire() as conn:
         await conn.execute("""
-            INSERT INTO anime_codes (code, title, poster_file_id, parts_file_ids)
-            VALUES ($1, $2, $3, $4)
+            INSERT INTO anime_codes (code, title, caption, poster_file_id, parts_file_ids)
+            VALUES ($1, $2, $3, $4, $5)
             ON CONFLICT (code) DO UPDATE SET
                 title = EXCLUDED.title,
+                caption = EXCLUDED.caption,
                 poster_file_id = EXCLUDED.poster_file_id,
                 parts_file_ids = EXCLUDED.parts_file_ids;
-        """, code, title, poster_file_id, parts_file_ids)
+        """, code, title, caption, poster_file_id, parts_file_ids)
 
 async def get_anime(code: str):
     pool = await get_conn()
     async with pool.acquire() as conn:
         row = await conn.fetchrow("""
-            SELECT code, title, poster_file_id, parts_file_ids
+            SELECT code, title, caption, poster_file_id, parts_file_ids
             FROM anime_codes
             WHERE code = $1
         """, code)
@@ -130,7 +142,7 @@ async def get_all_animes():
     pool = await get_conn()
     async with pool.acquire() as conn:
         rows = await conn.fetch("""
-            SELECT code, title, poster_file_id, parts_file_ids FROM anime_codes
+            SELECT code, title, caption, poster_file_id, parts_file_ids FROM anime_codes
         """)
         return [dict(r) for r in rows]
 
@@ -140,6 +152,13 @@ async def delete_anime(code: str):
         await conn.execute("DELETE FROM stats WHERE code = $1", code)
         result = await conn.execute("DELETE FROM anime_codes WHERE code = $1", code)
         return result.endswith("1")
+
+async def update_anime_code(old_code, new_code, new_title, new_caption=""):
+    pool = await get_conn()
+    async with pool.acquire() as conn:
+        await conn.execute("""
+            UPDATE anime_codes SET code = $1, title = $2, caption = $3 WHERE code = $4
+        """, new_code, new_title, new_caption, old_code)
 
 # === Statistika bilan ishlash ===
 async def increment_stat(code, field):
@@ -162,14 +181,6 @@ async def get_code_stat(code):
     async with pool.acquire() as conn:
         return await conn.fetchrow("SELECT searched, viewed FROM stats WHERE code = $1", code)
 
-# === Kodni yangilash ===
-async def update_anime_code(old_code, new_code, new_title):
-    pool = await get_conn()
-    async with pool.acquire() as conn:
-        await conn.execute("""
-            UPDATE anime_codes SET code = $1, title = $2 WHERE code = $3
-        """, new_code, new_title, old_code)
-
 # === Adminlar bilan ishlash ===
 async def get_all_admins():
     pool = await get_conn()
@@ -189,10 +200,3 @@ async def remove_admin(user_id: int):
     pool = await get_conn()
     async with pool.acquire() as conn:
         await conn.execute("DELETE FROM admins WHERE user_id = $1", user_id)
-
-# === Barcha foydalanuvchilarni olish ===
-async def get_all_user_ids():
-    pool = await get_conn()
-    async with pool.acquire() as conn:
-        rows = await conn.fetch("SELECT user_id FROM users")
-        return [row["user_id"] for row in rows]
