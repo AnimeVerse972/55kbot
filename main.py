@@ -39,8 +39,8 @@ keep_alive()
 API_TOKEN = os.getenv("API_TOKEN")
 CHANNELS = []
 LINKS = []
-MAIN_CHANNELS = [-1002874005325]
-MAIN_LINKS = ["https://t.me/aniversebaza"]
+MAIN_CHANNELS = []
+MAIN_LINKS = []
 BOT_USERNAME = os.getenv("BOT_USERNAME")
 
 bot = Bot(token=API_TOKEN)
