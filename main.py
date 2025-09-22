@@ -523,24 +523,32 @@ async def show_code_stat(message: types.Message, state: FSMContext):
     await send_admin_panel(message)
 
 
-# === Kodni tahrirlash ===
+# === Kodni tahrirlash (ANIME) ===
 @dp.message_handler(lambda m: m.text == "✏️ Kodni tahrirlash", user_id=ADMINS)
-async def edit_code_start(message: types.Message):
-    await EditCode.WaitingForOldCode.set()
-    await message.answer("Qaysi kodni tahrirlashni xohlaysiz? (eski kodni yuboring)", reply_markup=control_keyboard())
+async def edit_anime_start(message: types.Message):
+    await EditAnimeStates.waiting_for_code.set()
+    await message.answer(
+        "📝 Qaysi anime KODini tahrirlamoqchisiz?",
+        reply_markup=control_keyboard()   # 🔹 Boshqarish tugmasi chiqadi
+    )
 
-@dp.message_handler(state=EditCode.WaitingForOldCode, user_id=ADMINS)
-async def get_old_code(message: types.Message, state: FSMContext):
+@dp.message_handler(state=EditAnimeStates.waiting_for_code, user_id=ADMINS)
+async def edit_anime_code(message: types.Message, state: FSMContext):
+    # 🔹 Agar admin "📡 Boshqarish" tugmasini bossa
     if message.text == "📡 Boshqarish":
         await state.finish()
         await send_admin_panel(message)
         return
 
     code = message.text.strip()
-    post = await get_kino_by_code(code)
-    if not post:
-        await message.answer("❌ Bunday kod topilmadi. Qaytadan urinib ko‘ring.", reply_markup=control_keyboard())
+    anime = await get_kino_by_code(code)
+    if not anime:
+        await message.answer(
+            "❌ Bunday kod topilmadi.",
+            reply_markup=control_keyboard()
+        )
         return
+
     await state.update_data(code=code)
     await EditAnimeStates.menu.set()
     await message.answer(
