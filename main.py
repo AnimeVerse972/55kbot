@@ -39,8 +39,8 @@ keep_alive()
 API_TOKEN = os.getenv("API_TOKEN")
 CHANNELS = []
 LINKS = []
-MAIN_CHANNELS = []
-MAIN_LINKS = []
+MAIN_CHANNELS = [-1002874005325]
+MAIN_LINKS = ["https://t.me/aniversebaza"]
 BOT_USERNAME = os.getenv("BOT_USERNAME")
 
 bot = Bot(token=API_TOKEN)
@@ -662,44 +662,7 @@ async def anime_done_handler(message: types.Message, state: FSMContext):
     )
     await state.finish()
 
-# Admin kodni kiritsa
-@dp.message_handler(state=PostStates.waiting_for_code)
-async def process_code(message: types.Message, state: FSMContext):
-    code = message.text.strip()
-    anime = await get_kino_by_code(code)
-    if not anime:
-        await message.answer("❌ Bunday KOD topilmadi!")
-        await state.finish()
-        return
 
-    await state.update_data(code=code)
-
-    # Inline tugma foydalanuvchiga botni start qilish bilan yuboradi
-    keyboard = InlineKeyboardMarkup().add(
-        InlineKeyboardButton(
-            "📥 Yuklab olish",
-            url=f"https://t.me/{BOT_USERNAME}?start={code}"
-        )
-    )
-
-    try:
-        if anime.get('poster_file_id'):
-            await bot.send_photo(
-                chat_id=message.chat.id,
-                photo=anime['poster_file_id'],
-                caption=f"🎬 {anime.get('title','')}\n\n{anime.get('caption','')}",
-                reply_markup=keyboard
-            )
-        else:
-            await bot.send_message(
-                chat_id=message.chat.id,
-                text=f"🎬 {anime.get('title','')}\n\n{anime.get('caption','')}",
-                reply_markup=keyboard
-            )
-    except Exception as e:
-        await message.answer(f"❌ Postni yuborib bo‘lmadi: {e}")
-
-    await state.finish() 
 # === Post qilish (asosiy kanallarga yuborish) ===
 @dp.message_handler(lambda m: m.text == "📤 Post qilish" and m.from_user.id in ADMINS)
 async def start_post_channels(message: types.Message):
