@@ -662,7 +662,6 @@ async def anime_done_handler(message: types.Message, state: FSMContext):
     )
     await state.finish()
 
-
 # === Post qilish (asosiy kanallarga yuborish) ===
 @dp.message_handler(lambda m: m.text == "📤 Post qilish" and m.from_user.id in ADMINS)
 async def start_post_channels(message: types.Message):
@@ -675,13 +674,8 @@ async def start_post_channels(message: types.Message):
         reply_markup=control_keyboard()
     )
 
-
 @dp.message_handler(state=PostStates.waiting_for_code)
 async def send_post_to_main_channels(message: types.Message, state: FSMContext):
-    """
-    Kod kiritilgach, reklama postini caption bilan birga MAIN_CHANNELS ro‘yxatidagi
-    kanallarga yuboradi.
-    """
     if message.text == "📡 Boshqarish":
         await state.finish()
         await send_admin_panel(message)
@@ -693,7 +687,6 @@ async def send_post_to_main_channels(message: types.Message, state: FSMContext):
                              reply_markup=control_keyboard())
         return
 
-    # ✅ Bazadan anime ma'lumotini olish
     data = await get_kino_by_code(code)
     if not data:
         await message.answer("❌ Bunday kod topilmadi.", reply_markup=control_keyboard())
@@ -702,7 +695,6 @@ async def send_post_to_main_channels(message: types.Message, state: FSMContext):
     poster_file_id = data.get("poster_file_id")
     caption = data.get("caption", "")
 
-    # 🔘 Tugma: foydalanuvchi bosganda botga /start=code bilan kiradi
     keyboard = InlineKeyboardMarkup().add(
         InlineKeyboardButton(
             "✨Yuklab olish✨",
@@ -712,7 +704,6 @@ async def send_post_to_main_channels(message: types.Message, state: FSMContext):
 
     successful, failed = 0, 0
 
-    # 🔹 Asosiy kanallar ro‘yxati – ENV dan kelgan MAIN_CHANNELS dan foydalanamiz
     for ch in MAIN_CHANNELS:
         try:
             if poster_file_id:
@@ -725,18 +716,21 @@ async def send_post_to_main_channels(message: types.Message, state: FSMContext):
             else:
                 await bot.send_message(
                     chat_id=ch,
-                    text=caption or "Anime tayyor!",
+                    text=caption or "📢 Yangi anime!",
                     reply_markup=keyboard
                 )
             successful += 1
         except Exception as e:
-            print(f"Xato: {e}")
             failed += 1
+            print(f"⚠️ Kanalga yuborishda xato: {e}")
 
     await message.answer(
-        f"✅ Post yuborildi.\n\n✅ Muvaffaqiyatli: {successful}\n❌ Xatolik: {failed}",
+        f"✅ Post yuborildi!\n"
+        f"📡 Muvaffaqiyatli: {successful}\n"
+        f"❌ Xatolik: {failed}",
         reply_markup=admin_keyboard()
     )
+
     await state.finish()
 
 # === Kodlar ro'yxati ===
