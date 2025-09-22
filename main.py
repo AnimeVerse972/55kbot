@@ -524,13 +524,13 @@ async def show_code_stat(message: types.Message, state: FSMContext):
 
 
 # === Kodni tahrirlash ===
-@dp.message_handler(lambda m: m.text == "✏️ Kodni tahrirlash", user_id=ADMINS)
-async def edit_anime_start(message: types.Message):
-    await EditAnimeStates.waiting_for_code.set()
-    await message.answer("📝 Qaysi anime KODini tahrirlamoqchisiz?")
-
 @dp.message_handler(state=EditAnimeStates.waiting_for_code, user_id=ADMINS)
 async def edit_anime_code(message: types.Message, state: FSMContext):
+    if message.text == "📡 Boshqarish":
+        await state.finish()
+        await send_admin_panel(message)
+        return
+
     code = message.text.strip()
     anime = await get_kino_by_code(code)
     if not anime:
