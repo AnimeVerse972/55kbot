@@ -202,54 +202,26 @@ async def get_all_user_ids():
 
 # === Qism qo‘shish ===
 async def add_part_to_anime(code: str, file_id: str):
-    """
-    Berilgan code uchun yangi qism (file_id) ni parts_file_ids arrayiga qo‘shadi
-    va post_count ni yangilaydi.
-    """
     async with db_pool.acquire() as conn:
-        row = await conn.fetchrow("""
-            SELECT parts_file_ids FROM kino_codes WHERE code = $1
-        """, code)
-        if not row:
-            return False
-
+        row = await conn.fetchrow("SELECT parts_file_ids FROM kino_codes WHERE code=$1", code)
         parts = json.loads(row["parts_file_ids"]) if row["parts_file_ids"] else []
         parts.append(file_id)
+        await conn.execute(
+            "UPDATE kino_codes SET parts_file_ids=$1 WHERE code=$2",
+            json.dumps(parts),
+            code
+        )
 
-        await conn.execute("""
-            UPDATE kino_codes
-            SET parts_file_ids = $1,
-                post_count = $2
-            WHERE code = $3
-        """, json.dumps(parts), len(parts), code)
-        return True
-
-
-# === Qismni o‘chirish ===
 async def delete_part_from_anime(code: str, index: int):
-    """
-    Berilgan code uchun parts_file_ids arrayidagi
-    index bo‘yicha qismni o‘chiradi (0-dan boshlanadi)
-    va post_count ni yangilaydi.
-    """
     async with db_pool.acquire() as conn:
-        row = await conn.fetchrow("""
-            SELECT parts_file_ids FROM kino_codes WHERE code = $1
-        """, code)
-        if not row:
-            return False
-
+        row = await conn.fetchrow("SELECT parts_file_ids FROM kino_codes WHERE code=$1", code)
         parts = json.loads(row["parts_file_ids"]) if row["parts_file_ids"] else []
         if index < 0 or index >= len(parts):
-            return False  # noto‘g‘ri indeks
-
-        # Qismni o‘chirish
+            return False
         parts.pop(index)
-
-        await conn.execute("""
-            UPDATE kino_codes
-            SET parts_file_ids = $1,
-                post_count = $2
-            WHERE code = $3
-        """, json.dumps(parts), len(parts), code)
+        await conn.execute(
+            "UPDATE kino_codes SET parts_file_ids=$1 WHERE code=$2",
+            json.dumps(parts),
+            code
+        )
         return True
