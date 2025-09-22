@@ -27,7 +27,9 @@ from database import (
     get_all_user_ids,
     update_anime_code,
     get_today_users,
-    add_anime  # ✅ shu funksiya anime qo‘shish uchun
+    add_anime,
+    add_part_to_anime,
+    delete_part_from_anime
 )
 
 # === YUKLAMALAR ===
