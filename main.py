@@ -700,6 +700,83 @@ async def process_code(message: types.Message, state: FSMContext):
         await message.answer(f"❌ Postni yuborib bo‘lmadi: {e}")
 
     await state.finish() 
+
+# === Kod bo‘yicha postni asosiy kanallarga yuborish ===
+@dp.message_handler(lambda m: m.text == "📤 Post qilish" and m.from_user.id in ADMINS)
+async def start_post_channels(message: types.Message):
+    """
+    Admin "📤 Post qilish" tugmasini bosganda kod so‘raymiz
+    """
+    await PostStates.waiting_for_code.set()
+    await message.answer(
+        "🔢 Qaysi anime KODini asosiy kanallarga yubormoqchisiz?\nMasalan: `147`",
+        reply_markup=control_keyboard()
+    )
+#POST QILISH
+@dp.message_handler(state=PostStates.waiting_for_code)
+async def send_post_to_main_channels(message: types.Message, state: FSMContext):
+    """
+    Kodni kiritgach, reklama postini caption bilan birga asosiy kanallarga jo‘natadi.
+    """
+    if message.text == "📡 Boshqarish":
+        await state.finish()
+        await send_admin_panel(message)
+        return
+
+    code = message.text.strip()
+    if not code.isdigit():
+        await message.answer(
+            "❌ Kod faqat raqamlardan iborat bo‘lishi kerak.",
+            reply_markup=control_keyboard()
+        )
+        return
+
+    # ✅ Bazadan anime ma'lumotini olish
+    data = await get_kino_by_code(code)
+    if not data:
+        await message.answer("❌ Bunday kod topilmadi.", reply_markup=control_keyboard())
+        return
+
+    poster_file_id = data.get("poster_file_id")
+    caption = data.get("caption", "")
+
+    # 🔘 Inline tugma – foydalanuvchi bosganda botga /start=code bilan keladi
+    keyboard = InlineKeyboardMarkup().add(
+        InlineKeyboardButton(
+            "✨Yuklab olish✨",
+            url=f"https://t.me/{BOT_USERNAME}?start={code}"
+        )
+    )
+
+    successful, failed = 0, 0
+
+    # MAIN_CHANNELS – siz oldindan belgilab qo‘ygan asosiy kanallar ro‘yxati
+    for ch in MAIN_CHANNELS:
+        try:
+            if poster_file_id:
+                await bot.send_photo(
+                    chat_id=ch,
+                    photo=poster_file_id,
+                    caption=caption,
+                    reply_markup=keyboard
+                )
+            else:
+                await bot.send_message(
+                    chat_id=ch,
+                    text=caption or "Anime tayyor!",
+                    reply_markup=keyboard
+                )
+            successful += 1
+        except Exception as e:
+            print(f"Xato: {e}")
+            failed += 1
+
+    await message.answer(
+        f"✅ Post yuborildi.\n\n✅ Muvaffaqiyatli: {successful}\n❌ Xatolik: {failed}",
+        reply_markup=admin_keyboard()
+    )
+    await state.finish()
+
 # === Kodlar ro'yxati ===
 @dp.message_handler(lambda m: m.text == "📄 Kodlar ro‘yxati")
 async def show_all_animes(message: types.Message):
