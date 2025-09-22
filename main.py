@@ -590,6 +590,30 @@ async def go_back(message: types.Message, state: FSMContext):
     await state.finish()
     await send_admin_panel(message)
 
+# === Kodni o'chirish ===
+@dp.message_handler(lambda m: m.text == "❌ Kodni o‘chirish", user_id=ADMINS)
+async def ask_delete_code(message: types.Message):
+    await AdminStates.waiting_for_delete_code.set()
+    await message.answer("🗑 Qaysi kodni o‘chirmoqchisiz? Kodni yuboring.", reply_markup=control_keyboard())
+
+@dp.message_handler(state=AdminStates.waiting_for_delete_code)
+async def delete_code_handler(message: types.Message, state: FSMContext):
+    if message.text == "📡 Boshqarish":
+        await state.finish()
+        await send_admin_panel(message)
+        return
+
+    await state.finish()
+    code = message.text.strip()
+    if not code.isdigit():
+        await message.answer("❗ Noto‘g‘ri format. Kod raqamini yuboring.", reply_markup=control_keyboard())
+        return
+    deleted = await delete_kino_code(code)
+    if deleted:
+        await message.answer(f"✅ Kod {code} o‘chirildi.", reply_markup=admin_keyboard())
+    else:
+        await message.answer("❌ Kod topilmadi yoki o‘chirib bo‘lmadi.", reply_markup=admin_keyboard())
+
 # === ➕ Anime qo‘shish ===
 @dp.message_handler(lambda m: m.text == "➕ Anime qo‘shish")
 async def start_add_anime(message: types.Message, state: FSMContext):
