@@ -662,20 +662,19 @@ async def anime_done_handler(message: types.Message, state: FSMContext):
     )
     await state.finish()
 
-# === Post qilish (asosiy kanallarga yuborish) ===
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+# === ➤ Post qilish (Endi bazaga mos) ===
 @dp.message_handler(lambda m: m.text == "📤 Post qilish" and m.from_user.id in ADMINS)
-async def start_post_channels(message: types.Message):
-    """
-    Admin kodni so‘rashi
-    """
+async def start_post_process(message: types.Message):
     await PostStates.waiting_for_code.set()
     await message.answer(
-        "🔢 Qaysi anime KODini asosiy kanallarga yubormoqchisiz?\nMasalan: `147`",
+        "🔢 Qaysi anime KODini kanalga yubormoqchisiz?\nMasalan: `147`",
         reply_markup=control_keyboard()
     )
 
 @dp.message_handler(state=PostStates.waiting_for_code)
-async def send_post_to_main_channels(message: types.Message, state: FSMContext):
+async def send_post_by_code(message: types.Message, state: FSMContext):
     if message.text == "📡 Boshqarish":
         await state.finish()
         await send_admin_panel(message)
@@ -683,19 +682,17 @@ async def send_post_to_main_channels(message: types.Message, state: FSMContext):
 
     code = message.text.strip()
     if not code.isdigit():
-        await message.answer("❌ Kod faqat raqamlardan iborat bo‘lishi kerak.",
-                             reply_markup=control_keyboard())
+        await message.answer("❌ Kod faqat raqamlardan iborat bo‘lishi kerak.", reply_markup=control_keyboard())
         return
 
-    data = await get_kino_by_code(code)
-    if not data:
+    # ✅ Bazadan anime ma'lumotini olish
+    kino = await get_kino_by_code(code)
+    if not kino:
         await message.answer("❌ Bunday kod topilmadi.", reply_markup=control_keyboard())
         return
 
-    poster_file_id = data.get("poster_file_id")
-    caption = data.get("caption", "")
-
-    keyboard = InlineKeyboardMarkup().add(
+    # 🔘 Yuklab olish tugmasini yaratish
+    download_btn = InlineKeyboardMarkup().add(
         InlineKeyboardButton(
             "✨Yuklab olish✨",
             url=f"https://t.me/{BOT_USERNAME}?start={code}"
@@ -703,34 +700,27 @@ async def send_post_to_main_channels(message: types.Message, state: FSMContext):
     )
 
     successful, failed = 0, 0
-
     for ch in MAIN_CHANNELS:
         try:
-            if poster_file_id:
-                await bot.send_photo(
-                    chat_id=ch,
-                    photo=poster_file_id,
-                    caption=caption,
-                    reply_markup=keyboard
-                )
-            else:
-                await bot.send_message(
-                    chat_id=ch,
-                    text=caption or "📢 Yangi anime!",
-                    reply_markup=keyboard
-                )
+            # Poster faylini yuborish
+            if kino['poster_file_id']:
+                if kino.get('caption'):
+                    await bot.send_photo(ch, kino['poster_file_id'], caption=kino['caption'], reply_markup=download_btn)
+                else:
+                    await bot.send_photo(ch, kino['poster_file_id'], reply_markup=download_btn)
+            # Agar poster video yoki document bo‘lsa
+            elif kino['poster_file_id']:
+                await bot.send_document(ch, kino['poster_file_id'], caption=kino.get('caption', ''), reply_markup=download_btn)
+
             successful += 1
         except Exception as e:
+            print(f"Xato: {e}")
             failed += 1
-            print(f"⚠️ Kanalga yuborishda xato: {e}")
 
     await message.answer(
-        f"✅ Post yuborildi!\n"
-        f"📡 Muvaffaqiyatli: {successful}\n"
-        f"❌ Xatolik: {failed}",
+        f"✅ Post yuborildi.\n\n✅ Muvaffaqiyatli: {successful}\n❌ Xatolik: {failed}",
         reply_markup=admin_keyboard()
     )
-
     await state.finish()
 
 # === Kodlar ro'yxati ===
