@@ -700,23 +700,24 @@ async def process_code(message: types.Message, state: FSMContext):
         await message.answer(f"❌ Postni yuborib bo‘lmadi: {e}")
 
     await state.finish() 
-
-# === Kod bo‘yicha postni asosiy kanallarga yuborish ===
+# === Post qilish (asosiy kanallarga yuborish) ===
 @dp.message_handler(lambda m: m.text == "📤 Post qilish" and m.from_user.id in ADMINS)
 async def start_post_channels(message: types.Message):
     """
-    Admin "📤 Post qilish" tugmasini bosganda kod so‘raymiz
+    Admin kodni so‘rashi
     """
     await PostStates.waiting_for_code.set()
     await message.answer(
         "🔢 Qaysi anime KODini asosiy kanallarga yubormoqchisiz?\nMasalan: `147`",
         reply_markup=control_keyboard()
     )
-#POST QILISH
+
+
 @dp.message_handler(state=PostStates.waiting_for_code)
 async def send_post_to_main_channels(message: types.Message, state: FSMContext):
     """
-    Kodni kiritgach, reklama postini caption bilan birga asosiy kanallarga jo‘natadi.
+    Kod kiritilgach, reklama postini caption bilan birga MAIN_CHANNELS ro‘yxatidagi
+    kanallarga yuboradi.
     """
     if message.text == "📡 Boshqarish":
         await state.finish()
@@ -725,10 +726,8 @@ async def send_post_to_main_channels(message: types.Message, state: FSMContext):
 
     code = message.text.strip()
     if not code.isdigit():
-        await message.answer(
-            "❌ Kod faqat raqamlardan iborat bo‘lishi kerak.",
-            reply_markup=control_keyboard()
-        )
+        await message.answer("❌ Kod faqat raqamlardan iborat bo‘lishi kerak.",
+                             reply_markup=control_keyboard())
         return
 
     # ✅ Bazadan anime ma'lumotini olish
@@ -740,7 +739,7 @@ async def send_post_to_main_channels(message: types.Message, state: FSMContext):
     poster_file_id = data.get("poster_file_id")
     caption = data.get("caption", "")
 
-    # 🔘 Inline tugma – foydalanuvchi bosganda botga /start=code bilan keladi
+    # 🔘 Tugma: foydalanuvchi bosganda botga /start=code bilan kiradi
     keyboard = InlineKeyboardMarkup().add(
         InlineKeyboardButton(
             "✨Yuklab olish✨",
@@ -750,7 +749,7 @@ async def send_post_to_main_channels(message: types.Message, state: FSMContext):
 
     successful, failed = 0, 0
 
-    # MAIN_CHANNELS – siz oldindan belgilab qo‘ygan asosiy kanallar ro‘yxati
+    # 🔹 Asosiy kanallar ro‘yxati – ENV dan kelgan MAIN_CHANNELS dan foydalanamiz
     for ch in MAIN_CHANNELS:
         try:
             if poster_file_id:
