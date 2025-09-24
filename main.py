@@ -944,7 +944,7 @@ async def ask_broadcast_info(message: types.Message):
     )
 
 
-@dp.message_handler(state=AdminStates.waiting_for_broadcast_data, IsAdmin())
+@dp.message_handler(is_admin=True, state=AdminStates.waiting_for_broadcast_data)
 async def send_forward_only(message: types.Message, state: FSMContext):
     if message.text == "📡 Boshqarish":
         await state.finish()
