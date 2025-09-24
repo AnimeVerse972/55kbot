@@ -29,7 +29,7 @@ from database import (
     get_today_users,
     add_anime,
     add_part_to_anime,
-    delete_part_from_anime
+    delete_part_from_anime, get_all_admins, add_admin, remove_admin
 )
 
 # === YUKLAMALAR ===
@@ -56,15 +56,23 @@ def edit_menu_keyboard():
     kb.add("3️⃣ Qismni o‘chirish", "4️⃣ Ortga")
     return kb
 
+def admin_menu_keyboard():
+    kb = ReplyKeyboardMarkup(resize_keyboard=True)
+    kb.add("➕ Admin qo‘shish")
+    kb.add("➖ Admin o‘chirish")
+    kb.add("👥 Adminlar ro‘yxati")
+    kb.add("⬅️ Ortga")
+    return kb
+
 def admin_keyboard():
     """Asosiy admin paneli — 'Boshqarish' tugmasi MAVJUD EMAS"""
     kb = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    kb.add("➕ Anime qo‘shish")
-    kb.add("📊 Statistika", "📈 Kod statistikasi")
-    kb.add("❌ Kodni o‘chirish", "📄 Kodlar ro‘yxati")
-    kb.add("✏️ Kodni tahrirlash", "📤 Post qilish")
-    kb.add("📢 Habar yuborish", "📘 Qo‘llanma")
-    kb.add("➕ Admin qo‘shish", "📡 Kanal boshqaruvi")
+    kb.add("📡 Kanal boshqaruvi")
+    kb.add("❌ Kodni o‘chirish", "➕ Anime qo‘shish", "✏️ Kodni tahrirlash")
+    kb.add("📄 Kodlar ro‘yxati", "📈 Kod statistikasi", "📊 Statistika")
+    kb.add("👥 Adminlar")
+    kb.add("📢 Habar yuborish")
+    kb.add("📤 Post qilish", "📘 Qo‘llanma")
     return kb
 
 def control_keyboard():
@@ -74,13 +82,13 @@ def control_keyboard():
 async def send_admin_panel(message: types.Message):
     await message.answer("👮‍♂️ Admin panel:", reply_markup=admin_keyboard())
 
-# === HOLATLAR ===
 class AdminStates(StatesGroup):
     waiting_for_kino_data = State()
     waiting_for_delete_code = State()
     waiting_for_stat_code = State()
     waiting_for_broadcast_data = State()
     waiting_for_admin_id = State()
+    waiting_for_remove_id = State()   # ✅ qo‘shish kerak
 
 class AdminReplyStates(StatesGroup):
     waiting_for_reply_message = State()
@@ -454,11 +462,17 @@ async def delete_channel(callback: types.CallbackQuery):
 
     await callback.answer("O‘chirildi ✅")
 
-# === Admin qo'shish ===
+# 👥 Adminlar tugmasi bosilganda – bo‘limni ochish
+@dp.message_handler(lambda m: m.text == "👥 Adminlar", user_id=ADMINS)
+async def show_admin_menu(message: types.Message):
+    await message.answer("👥 Adminlar bo‘limi:", reply_markup=admin_menu_keyboard())
+
+# === Admin qo‘shish ===
 @dp.message_handler(lambda m: m.text == "➕ Admin qo‘shish", user_id=ADMINS)
 async def add_admin_start(message: types.Message):
     await AdminStates.waiting_for_admin_id.set()
     await message.answer("🆔 Yangi adminning Telegram ID raqamini yuboring.", reply_markup=control_keyboard())
+
 
 @dp.message_handler(state=AdminStates.waiting_for_admin_id, user_id=ADMINS)
 async def add_admin_process(message: types.Message, state: FSMContext):
@@ -467,7 +481,6 @@ async def add_admin_process(message: types.Message, state: FSMContext):
         await send_admin_panel(message)
         return
 
-    await state.finish()
     text = message.text.strip()
     if not text.isdigit():
         await message.answer("❗ Faqat raqam yuboring (Telegram user ID).", reply_markup=control_keyboard())
@@ -476,14 +489,58 @@ async def add_admin_process(message: types.Message, state: FSMContext):
     new_admin_id = int(text)
     if new_admin_id in ADMINS:
         await message.answer("ℹ️ Bu foydalanuvchi allaqachon admin.", reply_markup=control_keyboard())
+    else:
+        await add_admin(new_admin_id)        # ✅ DB ga qo‘shish
+        ADMINS.add(new_admin_id)             # ✅ Lokal to‘plamni yangilash
+        await message.answer(f"✅ <code>{new_admin_id}</code> admin sifatida qo‘shildi.",
+                             parse_mode="HTML", reply_markup=control_keyboard())
+        try:
+            await bot.send_message(new_admin_id, "✅ Siz botga admin sifatida qo‘shildingiz.")
+        except:
+            pass
+    await state.finish()
+
+
+# === Adminlar ro‘yxatini ko‘rsatish ===
+@dp.message_handler(lambda m: m.text == "👥 Adminlar ro‘yxati", user_id=ADMINS)
+async def show_admins(message: types.Message):
+    current_admins = await get_all_admins()    # ✅ Doim DB dan olish
+    if not current_admins:
+        await message.answer("ℹ️ Hozircha adminlar ro‘yxati bo‘sh.", reply_markup=control_keyboard())
+        return
+    admins_list = "\n".join([f"• <code>{a}</code>" for a in current_admins])
+    await message.answer(f"👥 Hozirgi adminlar:\n\n{admins_list}",
+                         parse_mode="HTML", reply_markup=control_keyboard())
+
+
+# === Admin o‘chirish ===
+@dp.message_handler(lambda m: m.text == "➖ Admin o‘chirish", user_id=ADMINS)
+async def remove_admin_start(message: types.Message):
+    await AdminStates.waiting_for_remove_id.set()
+    await message.answer("🗑 O‘chirish uchun adminning ID raqamini yuboring.", reply_markup=control_keyboard())
+
+
+@dp.message_handler(state=AdminStates.waiting_for_remove_id, user_id=ADMINS)
+async def remove_admin_process(message: types.Message, state: FSMContext):
+    if message.text == "📡 Boshqarish":
+        await state.finish()
+        await send_admin_panel(message)
         return
 
-    ADMINS.add(new_admin_id)
-    await message.answer(f"✅ <code>{new_admin_id}</code> admin sifatida qo‘shildi.", parse_mode="HTML", reply_markup=control_keyboard())
-    try:
-        await bot.send_message(new_admin_id, "✅ Siz botga admin sifatida qo‘shildingiz.")
-    except:
-        pass
+    text = message.text.strip()
+    if not text.isdigit():
+        await message.answer("❗ Faqat raqam yuboring (Telegram user ID).", reply_markup=control_keyboard())
+        return
+
+    remove_id = int(text)
+    if remove_id not in ADMINS:
+        await message.answer("ℹ️ Bu ID ro‘yxatda yo‘q.", reply_markup=control_keyboard())
+    else:
+        await remove_admin(remove_id)       # ✅ DB dan o‘chirish
+        ADMINS.remove(remove_id)            # ✅ Lokal to‘plamni yangilash
+        await message.answer(f"✅ <code>{remove_id}</code> admin ro‘yxatidan o‘chirildi.",
+                             parse_mode="HTML", reply_markup=control_keyboard())
+    await state.finish()
 
 
 # === Kod statistikasi ===
