@@ -513,7 +513,6 @@ async def show_admins(message: types.Message):
     await message.answer(
         f"👥 Hozirgi adminlar:\n\n{admins_list}",
         parse_mode="HTML",
-        reply_markup=control_keyboard()
     )
 
 
