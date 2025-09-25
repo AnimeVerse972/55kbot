@@ -464,6 +464,14 @@ async def delete_channel(callback: types.CallbackQuery):
             await callback.message.answer(f"❌ Asosiy kanal o‘chirildi!\n🆔 {cid}")
 
     await callback.answer("O‘chirildi ✅")
+    
+# === 👥 Adminlar menyusi ===
+@dp.message_handler(lambda m: m.text == "👥 Adminlar")
+async def open_admins_menu(message: types.Message):
+    if message.from_user.id not in ADMINS:
+        return  # ❌ oddiy foydalanuvchi kira olmaydi
+    
+    await message.answer("👥 Adminlarni boshqarish menyusi:", reply_markup=admin_menu_keyboard())
 
 # === Admin qo‘shish ===
 @dp.message_handler(state=AdminStates.waiting_for_admin_id)
