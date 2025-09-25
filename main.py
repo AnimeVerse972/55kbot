@@ -477,7 +477,7 @@ class IsAdmin(BoundFilter):
         return message.from_user.id in admins
 
 # === Admin qo‘shish ===
-@dp.message_handler(state=AdminStates.waiting_for_admin_id, IsAdmin())
+@dp.message_handler(IsAdmin(), state=AdminStates.waiting_for_admin_id)
 async def add_admin_process(message: types.Message, state: FSMContext):
     if message.text == "📡 Boshqarish":
         await state.finish()
@@ -509,7 +509,7 @@ async def add_admin_process(message: types.Message, state: FSMContext):
 
 
 # === Adminlar ro‘yxatini ko‘rsatish ===
-@dp.message_handler(lambda m: m.text == "👥 Adminlar ro‘yxati", IsAdmin())
+@dp.message_handler(IsAdmin(), lambda m: m.text == "👥 Adminlar ro‘yxati")
 async def show_admins(message: types.Message):
     current_admins = await get_admins()
     if not current_admins:
@@ -525,7 +525,7 @@ async def show_admins(message: types.Message):
 
 
 # === Admin o‘chirish ===
-@dp.message_handler(state=AdminStates.waiting_for_remove_id, IsAdmin())
+@dp.message_handler(IsAdmin(), state=AdminStates.waiting_for_remove_id)
 async def remove_admin_process(message: types.Message, state: FSMContext):
     if message.text == "📡 Boshqarish":
         await state.finish()
@@ -552,6 +552,7 @@ async def remove_admin_process(message: types.Message, state: FSMContext):
                 reply_markup=control_keyboard()
             )
     await state.finish()
+
 # === Kod statistikasi ===
 @dp.message_handler(lambda m: m.text == "📈 Kod statistikasi" and m.from_user.id in ADMINS)
 async def ask_stat_code(message: types.Message):
