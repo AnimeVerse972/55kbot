@@ -891,7 +891,7 @@ async def stats(message: types.Message):
 
 
 # === Orqaga tugmasi ===
-@dp.message_handler(lambda m: m.text == "⬅️ Orqaga", IsAdmin())
+@dp.message_handler(lambda m: m.text == "⬅️ Orqaga", is_admin=True)
 async def back_to_admin_menu(message: types.Message):
     await send_admin_panel(message)
 
@@ -951,7 +951,7 @@ async def back_to_qollanma(callback: types.CallbackQuery):
 
 
 # === Habar yuborish ===
-@dp.message_handler(lambda m: m.text == "📢 Habar yuborish", IsAdmin())
+@dp.message_handler(lambda m: m.text == "📢 Habar yuborish", is_admin=True)
 async def ask_broadcast_info(message: types.Message):
     await AdminStates.waiting_for_broadcast_data.set()
     await message.answer(
@@ -1002,9 +1002,6 @@ async def send_forward_only(message: types.Message, state: FSMContext):
         f"✅ Yuborildi: {success} ta\n❌ Xatolik: {fail} ta",
         reply_markup=admin_keyboard()
     )
-
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-import asyncio
 
 # === Kodni qidirish (raqam) ===
 @dp.message_handler(lambda message: message.text.isdigit())
