@@ -130,10 +130,16 @@ class AddAnimeStates(StatesGroup):
 class IsAdmin(BoundFilter):
     key = "is_admin"
 
-    async def check(self, message: types.Message):
+    async def check(self, obj):
         admins = await get_all_admins()
-        return message.from_user.id in admins
 
+        if isinstance(obj, types.Message):
+            return obj.from_user.id in admins
+        elif isinstance(obj, types.CallbackQuery):
+            return obj.from_user.id in admins
+
+        return False
+        
 dp.filters_factory.bind(IsAdmin)
 
 # === OBUNA TEKSHIRISH ===
