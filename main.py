@@ -473,16 +473,14 @@ async def open_admins_menu(message: types.Message):
 
 
 # === Admin qo‘shish ===
-@dp.message_handler(state=AdminStates.waiting_for_admin_id)
+@dp.message_handler(state=AdminStates.waiting_for_admin_id, user_id=ADMINS)
 async def add_admin_process(message: types.Message, state: FSMContext):
-    if message.from_user.id not in START_ADMINS:
-        return  # ❌ RAMda yangi qo‘shilgan adminlar ishlata olmaydi
-
     if message.text == "📡 Boshqarish":
         await state.finish()
         await send_admin_panel(message)
         return
 
+    await state.finish()
     text = message.text.strip()
     if not text.isdigit():
         await message.answer("❗ Faqat raqam yuboring (Telegram user ID).", reply_markup=control_keyboard())
@@ -491,24 +489,38 @@ async def add_admin_process(message: types.Message, state: FSMContext):
     new_admin_id = int(text)
     if new_admin_id in ADMINS:
         await message.answer("ℹ️ Bu foydalanuvchi allaqachon admin.", reply_markup=control_keyboard())
-    else:
-        ADMINS.add(new_admin_id)
-        await message.answer(
-            f"✅ <code>{new_admin_id}</code> admin sifatida qo‘shildi.",
-            parse_mode="HTML",
-            reply_markup=control_keyboard()
-        )
-        try:
-            await bot.send_message(new_admin_id, "✅ Siz botga admin sifatida qo‘shildingiz.")
-        except:
-            pass
+        return
+
+    ADMINS.add(new_admin_id)
+    await message.answer(f"✅ <code>{new_admin_id}</code> admin sifatida qo‘shildi.", parse_mode="HTML", reply_markup=control_keyboard())
+    try:
+        await bot.send_message(new_admin_id, "✅ Siz botga admin sifatida qo‘shildingiz.")
+    except:
+        pass
     await state.finish()
+
+# === Adminlar ro‘yxatini ko‘rsatish ===
+@dp.message_handler(lambda m: m.text == "👥 Adminlar ro‘yxati")
+async def show_admins(message: types.Message):
+    if message.from_user.id not in ADMINS:
+        return  # ❌ oddiy foydalanuvchi ishlata olmaydi
+
+    if not ADMINS:
+        await message.answer("ℹ️ Hozircha adminlar yo‘q.")
+        return
+
+    admins_list = "\n".join([f"• <code>{a}</code>" for a in sorted(ADMINS)])
+    await message.answer(
+        f"👥 Hozirgi adminlar:\n\n{admins_list}",
+        parse_mode="HTML",
+        reply_markup=control_keyboard()
+    )
 
 
 # === Admin o‘chirish ===
 @dp.message_handler(state=AdminStates.waiting_for_remove_id)
 async def remove_admin_process(message: types.Message, state: FSMContext):
-    if message.from_user.id not in START_ADMINS:
+    if message.from_user.id not in ADMINS:
         return  # ❌ RAMda yangi qo‘shilgan adminlar ishlata olmaydi
 
     if message.text == "📡 Boshqarish":
