@@ -465,21 +465,12 @@ async def delete_channel(callback: types.CallbackQuery):
 
     await callback.answer("O‘chirildi ✅")
 
-# === Adminlar ro‘yxatini DB + lokal bilan birlashtirib olish ===
-async def get_admins():
-    """DB + statik adminlarni birlashtirib olish"""
-    db_admins = await get_all_admins()
-    return ADMINS.union(db_admins)
-
-
-class IsAdmin(BoundFilter):
-    async def check(self, message: types.Message) -> bool:
-        admins = await get_admins()
-        return message.from_user.id in admins
-
 # === Admin qo‘shish ===
-@dp.message_handler(IsAdmin(), state=AdminStates.waiting_for_admin_id)
+@dp.message_handler(state=AdminStates.waiting_for_admin_id)
 async def add_admin_process(message: types.Message, state: FSMContext):
+    if message.from_user.id not in ADMINS:
+        return  # ❌ oddiy foydalanuvchi ishlata olmaydi
+
     if message.text == "📡 Boshqarish":
         await state.finish()
         await send_admin_panel(message)
@@ -491,12 +482,11 @@ async def add_admin_process(message: types.Message, state: FSMContext):
         return
 
     new_admin_id = int(text)
-    current_admins = await get_admins()
 
-    if new_admin_id in current_admins:
+    if new_admin_id in ADMINS:
         await message.answer("ℹ️ Bu foydalanuvchi allaqachon admin.", reply_markup=control_keyboard())
     else:
-        await add_admin(new_admin_id)   # ✅ faqat DB ga qo‘shiladi
+        ADMINS.add(new_admin_id)
         await message.answer(
             f"✅ <code>{new_admin_id}</code> admin sifatida qo‘shildi.",
             parse_mode="HTML",
@@ -510,14 +500,16 @@ async def add_admin_process(message: types.Message, state: FSMContext):
 
 
 # === Adminlar ro‘yxatini ko‘rsatish ===
-@dp.message_handler(IsAdmin(), lambda m: m.text == "👥 Adminlar ro‘yxati")
+@dp.message_handler(lambda m: m.text == "👥 Adminlar ro‘yxati")
 async def show_admins(message: types.Message):
-    current_admins = await get_admins()
-    if not current_admins:
+    if message.from_user.id not in ADMINS:
+        return  # ❌ oddiy foydalanuvchi ishlata olmaydi
+
+    if not ADMINS:
         await message.answer("ℹ️ Hozircha adminlar yo‘q.", reply_markup=control_keyboard())
         return
 
-    admins_list = "\n".join([f"• <code>{a}</code>" for a in sorted(current_admins)])
+    admins_list = "\n".join([f"• <code>{a}</code>" for a in sorted(ADMINS)])
     await message.answer(
         f"👥 Hozirgi adminlar:\n\n{admins_list}",
         parse_mode="HTML",
@@ -526,8 +518,11 @@ async def show_admins(message: types.Message):
 
 
 # === Admin o‘chirish ===
-@dp.message_handler(IsAdmin(), state=AdminStates.waiting_for_remove_id)
+@dp.message_handler(state=AdminStates.waiting_for_remove_id)
 async def remove_admin_process(message: types.Message, state: FSMContext):
+    if message.from_user.id not in ADMINS:
+        return  # ❌ oddiy foydalanuvchi ishlata olmaydi
+
     if message.text == "📡 Boshqarish":
         await state.finish()
         await send_admin_panel(message)
@@ -539,19 +534,15 @@ async def remove_admin_process(message: types.Message, state: FSMContext):
         return
 
     remove_id = int(text)
-    if remove_id in ADMINS:   # 🔒 asosiy adminlar o‘chmaydi
-        await message.answer("❌ Asosiy adminlarni o‘chirib bo‘lmaydi.", reply_markup=control_keyboard())
+    if remove_id not in ADMINS:
+        await message.answer("ℹ️ Bu ID ro‘yxatda yo‘q.", reply_markup=control_keyboard())
     else:
-        current_admins = await get_all_admins()
-        if remove_id not in current_admins:
-            await message.answer("ℹ️ Bu ID ro‘yxatda yo‘q.", reply_markup=control_keyboard())
-        else:
-            await remove_admin(remove_id)    # ✅ faqat DB dan o‘chirish
-            await message.answer(
-                f"✅ <code>{remove_id}</code> admin ro‘yxatidan o‘chirildi.",
-                parse_mode="HTML",
-                reply_markup=control_keyboard()
-            )
+        ADMINS.remove(remove_id)
+        await message.answer(
+            f"✅ <code>{remove_id}</code> admin ro‘yxatidan o‘chirildi.",
+            parse_mode="HTML",
+            reply_markup=control_keyboard()
+        )
     await state.finish()
 
 # === Kod statistikasi ===
@@ -698,11 +689,10 @@ async def delete_code_handler(message: types.Message, state: FSMContext):
 # === ➕ Anime qo‘shish ===
 @dp.message_handler(lambda m: m.text == "➕ Anime qo‘shish")
 async def start_add_anime(message: types.Message, state: FSMContext):
-    if message.from_user.id not in ADMINS:
+    if message.from_user.id not in ADMINS:   # 🔥 faqat shu joyda tekshir
         return
     await message.answer("📝 Kodni kiriting:")
     await AddAnimeStates.waiting_for_code.set()
-
 
 @dp.message_handler(state=AddAnimeStates.waiting_for_code)
 async def anime_code_handler(message: types.Message, state: FSMContext):
