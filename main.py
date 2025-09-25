@@ -474,7 +474,7 @@ async def open_admins_menu(message: types.Message):
 # === Admin qo‘shish ===
 @dp.message_handler(state=AdminStates.waiting_for_admin_id)
 async def add_admin_process(message: types.Message, state: FSMContext):
-    if message.from_user.id not in ADMINS:
+    if message.user_id=ADMINS:
         return  # ❌ oddiy foydalanuvchi ishlata olmaydi
 
     if message.text == "📡 Boshqarish":
@@ -512,7 +512,7 @@ async def show_admins(message: types.Message):
         return  # ❌ oddiy foydalanuvchi ishlata olmaydi
 
     if not ADMINS:
-        await message.answer("ℹ️ Hozircha adminlar yo‘q.", reply_markup=control_keyboard())
+        await message.answer("ℹ️ Hozircha adminlar yo‘q.")
         return
 
     admins_list = "\n".join([f"• <code>{a}</code>" for a in sorted(ADMINS)])
@@ -526,7 +526,7 @@ async def show_admins(message: types.Message):
 # === Admin o‘chirish ===
 @dp.message_handler(state=AdminStates.waiting_for_remove_id)
 async def remove_admin_process(message: types.Message, state: FSMContext):
-    if message.from_user.id not in ADMINS:
+    if message.user_id=ADMINS:
         return  # ❌ oddiy foydalanuvchi ishlata olmaydi
 
     if message.text == "📡 Boshqarish":
