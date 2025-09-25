@@ -69,13 +69,11 @@ def admin_menu_keyboard():
 
 def admin_keyboard():
     """Asosiy admin paneli — 'Boshqarish' tugmasi MAVJUD EMAS"""
-    kb = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    kb = ReplyKeyboardMarkup(resize_keyboard=True, row_width=3)
     kb.add("📡 Kanal boshqaruvi")
     kb.add("❌ Kodni o‘chirish", "➕ Anime qo‘shish", "✏️ Kodni tahrirlash")
     kb.add("📄 Kodlar ro‘yxati", "📈 Kod statistikasi", "📊 Statistika")
-    kb.add("👥 Adminlar")
-    kb.add("📢 Habar yuborish")
-    kb.add("📤 Post qilish", "📘 Qo‘llanma")
+    kb.add("👥 Adminlar", "📢 Habar yuborish", "📤 Post qilish")
     return kb
 
 def control_keyboard():
@@ -553,6 +551,16 @@ async def remove_admin_process(message: types.Message, state: FSMContext):
         )
     await state.finish()
 
+# === ⬅️ Ortga tugmasi ===
+@dp.message_handler(lambda m: m.text == "⬅️ Ortga")
+async def back_to_admin_panel(message: types.Message, state: FSMContext):
+    if message.from_user.id not in ADMINS:
+        return  # ❌ oddiy foydalanuvchi kira olmaydi
+
+    await state.finish()  # agar orada state ochilgan bo‘lsa yopiladi
+    await send_admin_panel(message)  # qaytib admin panelni chiqaradi
+
+
 # === Kod statistikasi ===
 @dp.message_handler(lambda m: m.text == "📈 Kod statistikasi" and m.from_user.id in ADMINS)
 async def ask_stat_code(message: types.Message):
@@ -867,62 +875,6 @@ async def stats(message: types.Message):
 @dp.message_handler(lambda m: m.text == "⬅️ Orqaga", user_id=ADMINS)
 async def back_to_admin_menu(message: types.Message):
     await send_admin_panel(message)
-
-
-# === Qo'llanma ===
-@dp.message_handler(lambda m: m.text == "📘 Qo‘llanma")
-async def qollanma(message: types.Message):
-    kb = InlineKeyboardMarkup(row_width=1)
-    kb.add(
-        InlineKeyboardButton("📥 1. Anime qo‘shish", callback_data="help_add"),
-        InlineKeyboardButton("📡 2. Kanal yaratish", callback_data="help_channel"),
-        InlineKeyboardButton("🆔 3. Reklama ID olish", callback_data="help_id"),
-        InlineKeyboardButton("🔁 4. Kod ishlashi", callback_data="help_code"),
-        InlineKeyboardButton("❓ 5. Savol-javob", callback_data="help_faq")
-    )
-    await message.answer("📘 Qanday yordam kerak?", reply_markup=kb)
-
-
-# === Qo'llanma sahifalari ===
-HELP_TEXTS = {
-    "help_add": ("📥 *Anime qo‘shish*\n\n`KOD @kanal REKLAMA_ID POST_SONI ANIME_NOMI`\n\nMisol: `91 @MyKino 4 12 Naruto`\n\n• *Kod* – foydalanuvchi yozadigan raqam\n• *@kanal* – server kanal username\n• *REKLAMA_ID* – post ID raqami (raqam)\n• *POST_SONI* – nechta qism borligi\n• *ANIME_NOMI* – ko‘rsatiladigan sarlavha\n\n📩 Endi formatda xabar yuboring:"),
-    "help_channel": ("📡 *Kanal yaratish*\n\n1. 2 ta kanal yarating:\n   • *Server kanal* – post saqlanadi\n   • *Reklama kanal* – bot ulashadi\n\n2. Har ikkasiga botni admin qiling\n\n3. Kanalni public (@username) qiling"),
-    "help_id": ("🆔 *Reklama ID olish*\n\n1. Server kanalga post joylang\n\n2. Post ustiga bosing → *Share* → *Copy link*\n\n3. Link oxiridagi sonni oling\n\nMisol: `t.me/MyKino/4` → ID = `4`"),
-    "help_code": ("🔁 *Kod ishlashi*\n\n1. Foydalanuvchi kod yozadi (masalan: `91`)\n\n2. Obuna tekshiriladi → reklama post yuboriladi\n\n3. Tugmalar orqali qismlarni ochadi"),
-    "help_faq": ("❓ *Tez-tez so‘raladigan savollar*\n\n• *Kodni qanday ulashaman?*\n  `https://t.me/{BOT_USERNAME}?start=91`\n\n• *Har safar yangi kanal kerakmi?*\n  – Yo‘q, bitta server kanal yetarli\n\n• *Kodni tahrirlash/o‘chirish mumkinmi?*\n  – Ha, admin menyuda ✏️ / ❌ tugmalari bor")
-}
-
-@dp.callback_query_handler(lambda c: c.data.startswith("help_"))
-async def show_help_page(callback: types.CallbackQuery):
-    key = callback.data
-    text = HELP_TEXTS.get(key, "❌ Ma'lumot topilmadi.")
-    kb = InlineKeyboardMarkup().add(InlineKeyboardButton("⬅️ Ortga", callback_data="back_help"))
-    try:
-        await callback.message.edit_text(text, parse_mode="Markdown", reply_markup=kb)
-    except:
-        await callback.message.answer(text, parse_mode="Markdown", reply_markup=kb)
-        await callback.message.delete()
-    finally:
-        await callback.answer()
-
-@dp.callback_query_handler(lambda c: c.data == "back_help")
-async def back_to_qollanma(callback: types.CallbackQuery):
-    kb = InlineKeyboardMarkup(row_width=1)
-    kb.add(
-        InlineKeyboardButton("📥 1. Anime qo‘shish", callback_data="help_add"),
-        InlineKeyboardButton("📡 2. Kanal yaratish", callback_data="help_channel"),
-        InlineKeyboardButton("🆔 3. Reklama ID olish", callback_data="help_id"),
-        InlineKeyboardButton("🔁 4. Kod ishlashi", callback_data="help_code"),
-        InlineKeyboardButton("❓ 5. Savol-javob", callback_data="help_faq")
-    )
-    try:
-        await callback.message.edit_text("📘 Qanday yordam kerak?", reply_markup=kb)
-    except:
-        await callback.message.answer("📘 Qanday yordam kerak?", reply_markup=kb)
-        await callback.message.delete()
-    finally:
-        await callback.answer()
-
 
 # === Habar yuborish ===
 @dp.message_handler(lambda m: m.text == "📢 Habar yuborish", user_id=ADMINS)
