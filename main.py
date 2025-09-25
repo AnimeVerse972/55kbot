@@ -15,6 +15,7 @@ from aiogram.types import (
     InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 )
 from aiogram.utils import executor
+from filters import IsAdmin
 from keep_alive import keep_alive
 from database import (
     init_db,
@@ -465,12 +466,18 @@ async def delete_channel(callback: types.CallbackQuery):
 
 # === Adminlar ro‘yxatini DB + lokal bilan birlashtirib olish ===
 async def get_admins():
-    db_admins = await get_all_admins()       # bazadan olish
-    return ADMINS.union(db_admins)           # ikkalasini qo‘shib yuborish
+    """DB + statik adminlarni birlashtirib olish"""
+    db_admins = await get_all_admins()
+    return ADMINS.union(db_admins)
 
+
+class IsAdmin(BoundFilter):
+    async def check(self, message: types.Message) -> bool:
+        admins = await get_admins()
+        return message.from_user.id in admins
 
 # === Admin qo‘shish ===
-@dp.message_handler(state=AdminStates.waiting_for_admin_id, user_id=ADMINS)
+@dp.message_handler(state=AdminStates.waiting_for_admin_id, IsAdmin())
 async def add_admin_process(message: types.Message, state: FSMContext):
     if message.text == "📡 Boshqarish":
         await state.finish()
@@ -489,8 +496,11 @@ async def add_admin_process(message: types.Message, state: FSMContext):
         await message.answer("ℹ️ Bu foydalanuvchi allaqachon admin.", reply_markup=control_keyboard())
     else:
         await add_admin(new_admin_id)   # ✅ faqat DB ga qo‘shiladi
-        await message.answer(f"✅ <code>{new_admin_id}</code> admin sifatida qo‘shildi.",
-                             parse_mode="HTML", reply_markup=control_keyboard())
+        await message.answer(
+            f"✅ <code>{new_admin_id}</code> admin sifatida qo‘shildi.",
+            parse_mode="HTML",
+            reply_markup=control_keyboard()
+        )
         try:
             await bot.send_message(new_admin_id, "✅ Siz botga admin sifatida qo‘shildingiz.")
         except:
@@ -499,16 +509,23 @@ async def add_admin_process(message: types.Message, state: FSMContext):
 
 
 # === Adminlar ro‘yxatini ko‘rsatish ===
-@dp.message_handler(lambda m: m.text == "👥 Adminlar ro‘yxati", user_id=ADMINS)
+@dp.message_handler(lambda m: m.text == "👥 Adminlar ro‘yxati", IsAdmin())
 async def show_admins(message: types.Message):
     current_admins = await get_admins()
+    if not current_admins:
+        await message.answer("ℹ️ Hozircha adminlar yo‘q.", reply_markup=control_keyboard())
+        return
+
     admins_list = "\n".join([f"• <code>{a}</code>" for a in sorted(current_admins)])
-    await message.answer(f"👥 Hozirgi adminlar:\n\n{admins_list}",
-                         parse_mode="HTML", reply_markup=control_keyboard())
+    await message.answer(
+        f"👥 Hozirgi adminlar:\n\n{admins_list}",
+        parse_mode="HTML",
+        reply_markup=control_keyboard()
+    )
 
 
 # === Admin o‘chirish ===
-@dp.message_handler(state=AdminStates.waiting_for_remove_id, user_id=ADMINS)
+@dp.message_handler(state=AdminStates.waiting_for_remove_id, IsAdmin())
 async def remove_admin_process(message: types.Message, state: FSMContext):
     if message.text == "📡 Boshqarish":
         await state.finish()
@@ -521,7 +538,7 @@ async def remove_admin_process(message: types.Message, state: FSMContext):
         return
 
     remove_id = int(text)
-    if remove_id in ADMINS:
+    if remove_id in ADMINS:   # 🔒 asosiy adminlar o‘chmaydi
         await message.answer("❌ Asosiy adminlarni o‘chirib bo‘lmaydi.", reply_markup=control_keyboard())
     else:
         current_admins = await get_all_admins()
@@ -529,10 +546,12 @@ async def remove_admin_process(message: types.Message, state: FSMContext):
             await message.answer("ℹ️ Bu ID ro‘yxatda yo‘q.", reply_markup=control_keyboard())
         else:
             await remove_admin(remove_id)    # ✅ faqat DB dan o‘chirish
-            await message.answer(f"✅ <code>{remove_id}</code> admin ro‘yxatidan o‘chirildi.",
-                                 parse_mode="HTML", reply_markup=control_keyboard())
+            await message.answer(
+                f"✅ <code>{remove_id}</code> admin ro‘yxatidan o‘chirildi.",
+                parse_mode="HTML",
+                reply_markup=control_keyboard()
+            )
     await state.finish()
-
 # === Kod statistikasi ===
 @dp.message_handler(lambda m: m.text == "📈 Kod statistikasi" and m.from_user.id in ADMINS)
 async def ask_stat_code(message: types.Message):
