@@ -470,7 +470,6 @@ async def open_admins_menu(message: types.Message):
     
     await message.answer("👥 Adminlarni boshqarish menyusi:", reply_markup=admin_menu_keyboard())
 
-
 @dp.message_handler(lambda m: m.text == "➕ Admin qo‘shish")
 async def start_add_admin(message: types.Message):
     if message.from_user.id not in ADMINS:
@@ -478,13 +477,31 @@ async def start_add_admin(message: types.Message):
     await message.answer("Yangi adminning Telegram ID raqamini yuboring:", reply_markup=control_keyboard())
     await AdminStates.waiting_for_admin_id.set()
 
+@dp.message_handler(state=AdminStates.waiting_for_admin_id)
+async def add_admin_process(message: types.Message, state: FSMContext):
+    if message.from_user.id not in ADMINS:
+        await message.answer("Sizda bu huquq yo'q.")
+        await state.finish()
+        return
+
+    text = message.text.strip()
+    if text == "📡 Boshqarish" or text == "⬅️ Ortga":
+        await state.finish()
+        await send_admin_panel(message)
+        return
+
+    if not text.isdigit():
+        await message.answer("❗ Faqat raqam yuboring (Telegram user ID).", reply_markup=control_keyboard())
+        return
+
     new_admin_id = int(text)
     if new_admin_id in ADMINS:
-        await message.answer("ℹ️ Bu foydalanuvchi allaqachon admin.")
+        await message.answer("ℹ️ Bu foydalanuvchi allaqachon admin.", reply_markup=control_keyboard())
+        await state.finish()
         return
 
     ADMINS.add(new_admin_id)
-    await message.answer(f"✅ <code>{new_admin_id}</code> admin sifatida qo‘shildi.", parse_mode="HTML")
+    await message.answer(f"✅ <code>{new_admin_id}</code> admin sifatida qo‘shildi.", parse_mode="HTML", reply_markup=control_keyboard())
     try:
         await bot.send_message(new_admin_id, "✅ Siz botga admin sifatida qo‘shildingiz.")
     except:
