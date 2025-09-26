@@ -1000,6 +1000,7 @@ async def download_all(callback: types.CallbackQuery):
         await callback.message.answer("❌ Kod topilmadi.")
         return
 
+    title = result.get("title", "Anime")
     parts_file_ids = result.get("parts_file_ids", [])
     if not parts_file_ids:
         await callback.message.answer("❌ Hech qanday qism topilmadi.")
@@ -1007,16 +1008,17 @@ async def download_all(callback: types.CallbackQuery):
 
     await callback.answer("⏳ Yuklanmoqda, biroz kuting...")
 
-    # Hamma qismlarni ketma-ket yuborish
-    for file_id in parts_file_ids:
+    for idx, file_id in enumerate(parts_file_ids, start=1):
         try:
-            if file_id.startswith("BQAD") or file_id.startswith("AgAD"):  # photo/video/document check (file_id formatiga qarab)
-                await bot.send_document(callback.from_user.id, file_id)
-            else:
-                await bot.send_document(callback.from_user.id, file_id)
-            await asyncio.sleep(0.1)  # flood control uchun sekin yuborish
-        except:
-            pass
+            caption = f"{title} [{idx}-qism]"
+            await bot.send_document(
+                chat_id=callback.from_user.id,
+                document=file_id,
+                caption=caption
+            )
+            await asyncio.sleep(0.1)  # flood control
+        except Exception as e:
+            print(f"Xatolik yuborishda {file_id}: {e}")
 
 # === START ===
 async def on_startup(dp):
