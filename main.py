@@ -473,11 +473,11 @@ async def open_admins_menu(message: types.Message):
 
 
 # === Admin qo‘shish ===
-@dp.message_handler(state=AdminStates.waiting_for_admin_id, user_id=ADMINS)
+@dp.message_handler(state=AdminStates.waiting_for_admin_id)
 async def add_admin_process(message: types.Message, state: FSMContext):
-    if message.text == "📡 Boshqarish":
+    if message.from_user.id not in ADMINS:
+        await message.answer("Sizda bu huquq yo'q.")
         await state.finish()
-        await send_admin_panel(message)
         return
 
     await state.finish()
@@ -520,8 +520,10 @@ async def show_admins(message: types.Message):
 @dp.message_handler(state=AdminStates.waiting_for_remove_id)
 async def remove_admin_process(message: types.Message, state: FSMContext):
     if message.from_user.id not in ADMINS:
-        return  # ❌ RAMda yangi qo‘shilgan adminlar ishlata olmaydi
-
+        await message.answer("Sizda bu huquq yo'q.")
+        await state.finish()
+        return
+        
     if message.text == "📡 Boshqarish":
         await state.finish()
         await send_admin_panel(message)
