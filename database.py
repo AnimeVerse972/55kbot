@@ -251,14 +251,16 @@ async def add_part_to_anime(code: str, file_id: str):
             code
         )
 
-async def delete_part_from_anime(code: str, index: int):
+async def delete_part_from_anime(code: str, part_number: int):
     pool = await get_conn()
     async with pool.acquire() as conn:
         row = await conn.fetchrow("SELECT parts_file_ids FROM kino_codes WHERE code=$1", code)
-        parts = json.loads(row["parts_file_ids"]) if row["parts_file_ids"] else []
-        if index < 0 or index >= len(parts):
+        if not row or not row["parts_file_ids"]:
             return False
-        parts.pop(index)
+        parts = json.loads(row["parts_file_ids"])
+        if part_number < 1 or part_number > len(parts):
+            return False
+        parts.pop(part_number - 1)  # 1-asosli → 0-asosli
         await conn.execute(
             "UPDATE kino_codes SET parts_file_ids=$1 WHERE code=$2",
             json.dumps(parts),
