@@ -496,7 +496,7 @@ async def add_admin_process(message: types.Message, state: FSMContext):
 
     new_admin_id = int(text)
     if new_admin_id in ADMINS:
-        await message.answer("ℹ️ Bu foydalanuvchi allaqachon admin.", reply_markup=control_keyboard())
+        await message.answer("ℹ️ Bu foydalanuvchi allaqachon admin.", reply_markup=admin_keyboard())
         await state.finish()
         return
 
@@ -532,7 +532,25 @@ async def start_remove_admin(message: types.Message):
         return
     await message.answer("O'chirish uchun admin ID raqamini yuboring:", reply_markup=control_keyboard())
     await AdminStates.waiting_for_remove_id.set()
-    
+
+@dp.message_handler(state=AdminStates.waiting_for_remove_id)
+async def remove_admin_process(message: types.Message, state: FSMContext):
+    if message.from_user.id not in ADMINS:
+        await message.answer("Sizda bu huquq yo'q.")
+        await state.finish()
+        return
+
+    text = message.text.strip()
+    if text == "📡 Boshqarish" or text == "⬅️ Ortga":
+        await state.finish()
+        await send_admin_panel(message)
+        return  # ✅ faqat shart bajarilsa qaytadi
+
+    if not text.isdigit():
+        await message.answer("❗ Faqat raqam yuboring (Telegram user ID).", reply_markup=control_keyboard())
+        await state.finish()
+        return
+
     remove_id = int(text)
     if remove_id not in ADMINS:
         await message.answer("ℹ️ Bu ID ro‘yxatda yo‘q.", reply_markup=control_keyboard())
@@ -541,7 +559,7 @@ async def start_remove_admin(message: types.Message):
         await message.answer(
             f"✅ <code>{remove_id}</code> admin ro‘yxatidan o‘chirildi.",
             parse_mode="HTML",
-            reply_markup=control_keyboard()
+            reply_markup=control_keyboard()  # ✅ tugma ham qo'shildi
         )
     await state.finish()
 
@@ -568,7 +586,10 @@ async def show_code_stat(message: types.Message, state: FSMContext):
         await state.finish()
         await send_admin_panel(message)
         return
-
+    if message.text == "📡 Boshqarish":
+            await state.finish()
+            await send_admin_panel(message)
+            return
     code = message.text.strip()
     if not code:
         await message.answer("❗ Kod yuboring.", reply_markup=control_keyboard())
