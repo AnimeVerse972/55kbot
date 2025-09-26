@@ -8,7 +8,6 @@ from datetime import datetime, date
 from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher, types
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
-from aiogram.dispatcher.filters import BoundFilter
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.types import (
@@ -16,7 +15,6 @@ from aiogram.types import (
     InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 )
 from aiogram.utils import executor
-from filters import IsAdmin
 from keep_alive import keep_alive
 from database import (
     init_db,
@@ -50,8 +48,9 @@ bot = Bot(token=API_TOKEN)
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
 
-ADMINS = {6486825926, 7346481297}
-START_ADMINS = {6486825926, 7346481297}
+START_ADMINS = [6486825926, 7346481297]  # dastlabki adminlar
+ADMINS = set(START_ADMINS)
+
 # === KEYBOARDS ===
 def edit_menu_keyboard():
     kb = ReplyKeyboardMarkup(resize_keyboard=True)
@@ -472,27 +471,20 @@ async def open_admins_menu(message: types.Message):
     await message.answer("👥 Adminlarni boshqarish menyusi:", reply_markup=admin_menu_keyboard())
 
 
-# === Admin qo‘shish ===
-@dp.message_handler(state=AdminStates.waiting_for_admin_id)
-async def add_admin_process(message: types.Message, state: FSMContext):
+@dp.message_handler(lambda m: m.text == "➕ Admin qo‘shish")
+async def start_add_admin(message: types.Message):
     if message.from_user.id not in ADMINS:
-        await message.answer("Sizda bu huquq yo'q.")
-        await state.finish()
         return
-
-    await state.finish()
-    text = message.text.strip()
-    if not text.isdigit():
-        await message.answer("❗ Faqat raqam yuboring (Telegram user ID).", reply_markup=control_keyboard())
-        return
+    await message.answer("Yangi adminning Telegram ID raqamini yuboring:", reply_markup=control_keyboard())
+    await AdminStates.waiting_for_admin_id.set()
 
     new_admin_id = int(text)
     if new_admin_id in ADMINS:
-        await message.answer("ℹ️ Bu foydalanuvchi allaqachon admin.", reply_markup=control_keyboard())
+        await message.answer("ℹ️ Bu foydalanuvchi allaqachon admin.")
         return
 
     ADMINS.add(new_admin_id)
-    await message.answer(f"✅ <code>{new_admin_id}</code> admin sifatida qo‘shildi.", parse_mode="HTML", reply_markup=control_keyboard())
+    await message.answer(f"✅ <code>{new_admin_id}</code> admin sifatida qo‘shildi.", parse_mode="HTML")
     try:
         await bot.send_message(new_admin_id, "✅ Siz botga admin sifatida qo‘shildingiz.")
     except:
@@ -517,23 +509,13 @@ async def show_admins(message: types.Message):
 
 
 # === Admin o‘chirish ===
-@dp.message_handler(state=AdminStates.waiting_for_remove_id)
-async def remove_admin_process(message: types.Message, state: FSMContext):
+@dp.message_handler(lambda m: m.text == "➖ Admin o‘chirish")
+async def start_remove_admin(message: types.Message):
     if message.from_user.id not in ADMINS:
-        await message.answer("Sizda bu huquq yo'q.")
-        await state.finish()
         return
-        
-    if message.text == "📡 Boshqarish":
-        await state.finish()
-        await send_admin_panel(message)
-        return
-
-    text = message.text.strip()
-    if not text.isdigit():
-        await message.answer("❗ Faqat raqam yuboring (Telegram user ID).", reply_markup=control_keyboard())
-        return
-
+    await message.answer("O'chirish uchun admin ID raqamini yuboring:", reply_markup=control_keyboard())
+    await AdminStates.waiting_for_remove_id.set()
+    
     remove_id = int(text)
     if remove_id not in ADMINS:
         await message.answer("ℹ️ Bu ID ro‘yxatda yo‘q.", reply_markup=control_keyboard())
