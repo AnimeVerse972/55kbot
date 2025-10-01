@@ -423,6 +423,21 @@ async def add_channel_finish(message: types.Message, state: FSMContext):
         await message.answer("❗ To‘liq link yuboring (masalan: https://t.me/...)")
         return
 
+    # 🔍 Bot adminligini tekshirish
+    try:
+        bot_info = await bot.me
+        member = await bot.get_chat_member(channel_id, bot_info.id)
+        if member.status not in ["administrator", "creator"]:
+            await message.answer(
+                "❌ Bot bu kanalda admin emas!\n👉 Avval botni admin qilib qo‘ying, keyin qayta urinib ko‘ring."
+            )
+            await state.finish()
+            return
+    except Exception as e:
+        await message.answer(f"⚠️ Kanal tekshirib bo‘lmadi: {e}")
+        await state.finish()
+        return
+    # 🔐 Agar admin bo‘lsa – keyin ro‘yxatga qo‘shamiz
     if ctype == "sub":
         if channel_id in CHANNELS:
             await message.answer("ℹ️ Bu kanal allaqachon qo‘shilgan.")
@@ -439,6 +454,7 @@ async def add_channel_finish(message: types.Message, state: FSMContext):
             await message.answer(f"✅ Asosiy kanal qo‘shildi!\n🆔 {channel_id}\n🔗 {channel_link}")
 
     await state.finish()
+
 
 
 # === Kanalni o‘chirish ===
